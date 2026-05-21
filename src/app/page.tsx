@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, ChevronDown, Calculator } from 'lucide-react';
-import { runAudit, AuditResult } from '@/lib/audit-engine';
+import { runAudit } from '@/lib/audit-engine';
 
 interface ToolEntry {
   id: string;
@@ -65,9 +65,9 @@ export default function Home() {
   const [entries, setEntries] = useState<ToolEntry[]>([]);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [useCase, setUseCase] = useState<string>('coding');
-  
+
   // NEW: State for audit results
-  const [auditResult, setAuditResult] = useState<<AuditResult | null>(null);
+  const [auditResult, setAuditResult] = useState<any>(null);
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
@@ -96,7 +96,7 @@ export default function Home() {
   }
 
   function updateEntry(id: string, field: keyof ToolEntry, value: string | number) {
-    setEntries(entries.map(entry => 
+    setEntries(entries.map(entry =>
       entry.id === id ? { ...entry, [field]: value } : entry
     ));
   }
@@ -252,7 +252,7 @@ export default function Home() {
 
             {/* Run Audit Button */}
             {entries.length > 0 && (
-              <button 
+              <button
                 onClick={() => {
                   const result = runAudit(entries, teamSize, useCase);
                   setAuditResult(result);
@@ -282,26 +282,24 @@ export default function Home() {
             {auditResult && auditResult.findings.length > 0 ? (
               <div className="space-y-4">
                 <h3 className="text-xl font-semibold text-white">Recommendations</h3>
-                {auditResult.findings.map((finding, index) => (
-                  <div 
-                    key={index} 
-                    className={`rounded-lg p-4 border ${
-                      finding.severity === 'high' 
-                        ? 'bg-red-500/10 border-red-500/30' 
-                        : finding.severity === 'medium'
+                {auditResult.findings.map((finding: any, index: number) => (
+                  <div
+                    key={index}
+                    className={`rounded-lg p-4 border ${finding.severity === 'high'
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : finding.severity === 'medium'
                         ? 'bg-yellow-500/10 border-yellow-500/30'
                         : 'bg-blue-500/10 border-blue-500/30'
-                    }`}
+                      }`}
                   >
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-semibold text-white">{finding.tool}</h4>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        finding.severity === 'high' 
-                          ? 'bg-red-500/20 text-red-400' 
-                          : finding.severity === 'medium'
+                      <span className={`text-xs px-2 py-1 rounded ${finding.severity === 'high'
+                        ? 'bg-red-500/20 text-red-400'
+                        : finding.severity === 'medium'
                           ? 'bg-yellow-500/20 text-yellow-400'
                           : 'bg-blue-500/20 text-blue-400'
-                      }`}>
+                        }`}>
                         {finding.severity.toUpperCase()}
                       </span>
                     </div>
