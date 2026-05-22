@@ -138,7 +138,7 @@ function checkMinimumSeats(entry: ToolEntry, toolData: ToolPricing): AuditFindin
 
     // If plan has minimum seats and user has fewer, recommend downgrade
     if (planData.minSeats > 1 && entry.seats < planData.minSeats) {
-        const recommendedPlan = findDowngradePlan(entry.tool, entry.plan, entry.seats);
+        const recommendedPlan = findDowngradePlan(entry.tool, entry.plan, entry.seats, entry.monthlySpend);
 
         if (recommendedPlan) {
             const recommendedPlanData = toolData.plans[recommendedPlan];
@@ -177,7 +177,7 @@ function checkPlanOverkill(entry: ToolEntry, toolData: ToolPricing): AuditFindin
 
     // For small teams, check if a lower plan would suffice
     if (entry.seats <= 2 && (entry.plan === 'Business' || entry.plan === 'Team' || entry.plan === 'Teams')) {
-        const recommendedPlan = findDowngradePlan(entry.tool, entry.plan, entry.seats);
+        const recommendedPlan = findDowngradePlan(entry.tool, entry.plan, entry.seats, entry.monthlySpend);
         if (recommendedPlan && recommendedPlan !== entry.plan) {
             const recommendedPlanData = toolData.plans[recommendedPlan];
             const recommendedSpend = recommendedPlanData.pricePerSeat * entry.seats;
@@ -205,7 +205,7 @@ function checkPlanOverkill(entry: ToolEntry, toolData: ToolPricing): AuditFindin
 /**
  * Helper: Find the best downgrade plan
  */
-function findDowngradePlan(tool: string, currentPlan: string, seats: number): string | null {
+function findDowngradePlan(tool: string, currentPlan: string, seats: number, currentSpend?: number): string | null {
     const toolData = PRICING_DATA[tool];
     if (!toolData) return null;
 
@@ -222,6 +222,11 @@ function findDowngradePlan(tool: string, currentPlan: string, seats: number): st
 
         // Skip Enterprise/Custom (price = 0 means custom)
         if (planData.pricePerSeat === 0 && planName !== 'Free') continue;
+
+        if (currentSpend !== undefined) {
+            const recommendedSpend = planData.pricePerSeat * seats;
+            if (recommendedSpend >= currentSpend) continue;
+        }
 
         return planName;
     }
