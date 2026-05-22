@@ -138,7 +138,6 @@ function checkMinimumSeats(entry: ToolEntry, toolData: ToolPricing): AuditFindin
 
     // If plan has minimum seats and user has fewer, recommend downgrade
     if (planData.minSeats > 1 && entry.seats < planData.minSeats) {
-        const effectiveMinSpend = planData.pricePerSeat * planData.minSeats;
         const recommendedPlan = findDowngradePlan(entry.tool, entry.plan, entry.seats);
 
         if (recommendedPlan) {
@@ -204,16 +203,6 @@ function checkPlanOverkill(entry: ToolEntry, toolData: ToolPricing): AuditFindin
 }
 
 /**
- * RULE 3: Duplicate tool check (handled at audit level, not per-tool)
- * If user pays for multiple similar coding assistants, flag it
- */
-
-/**
- * RULE 4: API vs seat-based check
- * If user has API direct + seat-based for same vendor, might be redundant
- */
-
-/**
  * Helper: Find the best downgrade plan
  */
 function findDowngradePlan(tool: string, currentPlan: string, seats: number): string | null {
@@ -260,7 +249,7 @@ function checkDuplicateTools(entries: ToolEntry[]): AuditFinding[] {
             currentPlan: `${userCodingTools.length} tools`,
             currentSpend: totalSpend,
             recommendedPlan: 'Consolidate to 1-2',
-            recommendedSpend: totalSpend * 0.6, // Estimate 40% savings
+            recommendedSpend: totalSpend * 0.6,
             savings: totalSpend * 0.4,
             savingsPercent: 40,
             reason: `You're paying for ${userCodingTools.length} coding assistants (${userCodingTools.map(e => PRICING_DATA[e.tool]?.name).join(', ')}). Most teams only need 1-2. Consider keeping ${PRICING_DATA[cheapest.tool]?.name} at $${cheapest.monthlySpend}/mo and dropping the rest.`,
@@ -299,22 +288,36 @@ export function runAudit(entries: ToolEntry[], teamSize: number, useCase: string
     const duplicateFindings = checkDuplicateTools(entries);
     findings.push(...duplicateFindings);
 
+    // DEDUPLICATE: Keep only highest savings finding per tool
+    const uniqueFindings: AuditFinding[] = [];
+    const bestFindingForTool = new Map<string, AuditFinding>();
+
+    for (const finding of findings) {
+        const existing = bestFindingForTool.get(finding.tool);
+        if (!existing || finding.savings > existing.savings) {
+            bestFindingForTool.set(finding.tool, finding);
+        }
+    }
+
+    uniqueFindings.push(...bestFindingForTool.values());
+    uniqueFindings.sort((a, b) => b.savings - a.savings);
+
     // Calculate totals
     const totalMonthlySpend = entries.reduce((sum, e) => sum + e.monthlySpend, 0);
-    const totalMonthlySavings = findings.reduce((sum, f) => sum + f.savings, 0);
+    const totalMonthlySavings = uniqueFindings.reduce((sum, f) => sum + f.savings, 0);
     const totalAnnualSavings = totalMonthlySavings * 12;
 
     // Generate summary
     let summary: string;
-    if (findings.length === 0) {
+    if (uniqueFindings.length === 0) {
         summary = `Your AI tool spend looks well-optimized at $${totalMonthlySpend}/month. We didn't find significant savings opportunities.`;
     } else {
-        const topFinding = findings.reduce((max, f) => f.savings > max.savings ? f : max, findings[0]);
-        summary = `We found ${findings.length} optimization${findings.length > 1 ? 's' : ''} that could save you $${Math.round(totalMonthlySavings)}/month ($${Math.round(totalAnnualSavings)}/year). The biggest opportunity: ${topFinding.reason}`;
+        const topFinding = uniqueFindings[0];
+        summary = `We found ${uniqueFindings.length} optimization${uniqueFindings.length > 1 ? 's' : ''} that could save you $${Math.round(totalMonthlySavings)}/month ($${Math.round(totalAnnualSavings)}/year). The biggest opportunity: ${topFinding.reason}`;
     }
 
     return {
-        findings,
+        findings: uniqueFindings,
         totalMonthlySpend,
         totalMonthlySavings,
         totalAnnualSavings,
