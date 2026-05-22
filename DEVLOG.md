@@ -54,3 +54,35 @@ oute.ts = API endpoint
 - Set up Supabase project with `audits` table
 - Add email capture form after results
 - Start on shareable URL system
+
+
+## Day 3 — 2026-05-23
+**Hours worked:** 4
+**What I did:** 
+- Set up Supabase project with `audits` table
+- Created `audits` table schema: id, created_at, tools_data, total_spend, total_savings, findings, email, company_name, role, team_size, use_case, share_id
+- Installed `@supabase/supabase-js` and created client in `src/lib/supabase.ts`
+- Built database layer in `src/lib/database.ts` with `saveAudit()` and `getAuditByShareId()`
+- Added email capture form after audit results with optional company name
+- Wired "Run Audit" button to save audit data to Supabase with unique `share_id`
+- Added `shareId`, `email`, `companyName`, `emailCaptured` states to page.tsx
+- Verified build passes and live deployment works
+
+**What I learned:** 
+- Supabase free tier is generous and fast to set up
+- `gen_random_uuid()` for primary keys, `share_id` for public URLs
+- Environment variables in Next.js: `NEXT_PUBLIC_` prefix for client-side access
+- JSONB columns in PostgreSQL store nested audit data efficiently
+- Row Level Security (RLS) is important but disabled for MVP speed
+
+**Blockers / what I'm stuck on:** 
+- Need to enable RLS policies on `audits` table for production security
+- Email sending (Resend/Postmark) not set up yet — just storing emails for now
+- Anthropic API credits status still unknown
+- Shareable URL page (`/audit/[id]`) not built yet
+
+**Plan for tomorrow:** 
+- Build shareable URL page (`/audit/[id]`) with PII stripped
+- Add Open Graph meta tags for link previews
+- Set up Resend for transactional emails
+- Integrate Anthropic API for AI-generated summary
