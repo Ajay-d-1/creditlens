@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, ChevronDown, Calculator } from 'lucide-react';
 import { runAudit } from '@/lib/audit-engine';
+import { saveAudit, generateShareId } from '@/lib/database';
 
 interface ToolEntry {
   id: string;
@@ -69,6 +70,10 @@ export default function Home() {
   // NEW: State for audit results
   const [auditResult, setAuditResult] = useState<any>(null);
   const [showResults, setShowResults] = useState(false);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [emailCaptured, setEmailCaptured] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('creditlens_form');
@@ -253,10 +258,28 @@ export default function Home() {
             {/* Run Audit Button */}
             {entries.length > 0 && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   const result = runAudit(entries, teamSize, useCase);
                   setAuditResult(result);
                   setShowResults(true);
+                  
+                  // Save to Supabase
+                  try {
+                    const newShareId = generateShareId();
+                    await saveAudit({
+                      tools_data: entries,
+                      total_spend: result.totalMonthlySpend,
+                      total_savings: result.totalMonthlySavings,
+                      findings: result.findings,
+                      team_size: teamSize,
+                      use_case: useCase,
+                      share_id: newShareId,
+                    });
+                    // Store shareId in state for later use
+                    setShareId(newShareId);
+                  } catch (err) {
+                    console.error('Failed to save audit:', err);
+                  }
                 }}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
               >
@@ -321,6 +344,59 @@ export default function Home() {
                 <p className="text-slate-400">{auditResult?.summary}</p>
               </div>
             )}
+
+            {/* Email Capture */}
+            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mt-6 mb-6">
+              <h3 className="text-lg font-semibold mb-2">Save your audit</h3>
+              <p className="text-slate-400 text-sm mb-4">Get your results via email and a shareable link.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Company name (optional)"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
+                />
+              </div>
+              
+              <button
+                onClick={async () => {
+                  if (!email) return;
+                  try {
+                    await saveAudit({
+                      tools_data: entries,
+                      total_spend: auditResult.totalMonthlySpend,
+                      total_savings: auditResult.totalMonthlySavings,
+                      findings: auditResult.findings,
+                      email,
+                      company_name: companyName,
+                      team_size: teamSize,
+                      use_case: useCase,
+                      share_id: shareId || generateShareId(),
+                    });
+                    setEmailCaptured(true);
+                  } catch (err) {
+                    console.error('Failed to save:', err);
+                  }
+                }}
+                disabled={!email}
+                className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                Save & Email Results
+              </button>
+              
+              {emailCaptured && (
+                <p className="text-green-400 mt-2">✓ Saved! Check your email.</p>
+              )}
+            </div>
 
             {/* Back Button */}
             <button
