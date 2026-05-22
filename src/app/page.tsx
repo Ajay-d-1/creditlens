@@ -74,6 +74,8 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [emailCaptured, setEmailCaptured] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('creditlens_form');
@@ -262,6 +264,23 @@ export default function Home() {
                   const result = runAudit(entries, teamSize, useCase);
                   setAuditResult(result);
                   setShowResults(true);
+                  setIsLoadingSummary(true);
+                  setAiSummary(null);
+
+                  // Fetch AI Summary
+                  fetch('/api/summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      findings: result.findings,
+                      totalSavings: result.totalMonthlySavings,
+                      tools: entries,
+                    }),
+                  })
+                    .then(res => res.json())
+                    .then(data => setAiSummary(data.summary))
+                    .catch(() => setAiSummary('Failed to load AI summary.'))
+                    .finally(() => setIsLoadingSummary(false));
                   
                   // Save to Supabase
                   try {
@@ -344,6 +363,24 @@ export default function Home() {
                 <p className="text-slate-400">{auditResult?.summary}</p>
               </div>
             )}
+
+            {/* AI Summary */}
+            <div className="bg-slate-800/80 rounded-xl p-6 border border-slate-700/50">
+              <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                <span className="text-cyan-400">✨</span> AI Executive Summary
+              </h3>
+              {isLoadingSummary ? (
+                <div className="animate-pulse space-y-2">
+                  <div className="h-4 bg-slate-700 rounded w-3/4"></div>
+                  <div className="h-4 bg-slate-700 rounded w-full"></div>
+                  <div className="h-4 bg-slate-700 rounded w-5/6"></div>
+                </div>
+              ) : (
+                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  {aiSummary}
+                </p>
+              )}
+            </div>
 
             {/* Email Capture */}
             <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mt-6 mb-6">
