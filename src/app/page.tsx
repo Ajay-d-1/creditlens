@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, ChevronDown, Calculator } from 'lucide-react';
-import { runAudit } from '@/lib/audit-engine';
-import { saveAudit, generateShareId } from '@/lib/database';
+import { runAudit, AuditResult } from '@/lib/audit-engine';
 
 interface ToolEntry {
   id: string;
@@ -66,16 +65,10 @@ export default function Home() {
   const [entries, setEntries] = useState<ToolEntry[]>([]);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [useCase, setUseCase] = useState<string>('coding');
-
+  
   // NEW: State for audit results
   const [auditResult, setAuditResult] = useState<any>(null);
   const [showResults, setShowResults] = useState(false);
-  const [shareId, setShareId] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [emailCaptured, setEmailCaptured] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('creditlens_form');
@@ -103,7 +96,7 @@ export default function Home() {
   }
 
   function updateEntry(id: string, field: keyof ToolEntry, value: string | number) {
-    setEntries(entries.map(entry =>
+    setEntries(entries.map(entry => 
       entry.id === id ? { ...entry, [field]: value } : entry
     ));
   }
@@ -259,46 +252,11 @@ export default function Home() {
 
             {/* Run Audit Button */}
             {entries.length > 0 && (
-              <button
-                onClick={async () => {
+              <button 
+                onClick={() => {
                   const result = runAudit(entries, teamSize, useCase);
                   setAuditResult(result);
                   setShowResults(true);
-                  setIsLoadingSummary(true);
-                  setAiSummary(null);
-
-                  // Fetch AI Summary
-                  fetch('/api/summary', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      findings: result.findings,
-                      totalSavings: result.totalMonthlySavings,
-                      tools: entries,
-                    }),
-                  })
-                    .then(res => res.json())
-                    .then(data => setAiSummary(data.summary))
-                    .catch(() => setAiSummary('Failed to load AI summary.'))
-                    .finally(() => setIsLoadingSummary(false));
-                  
-                  // Save to Supabase
-                  try {
-                    const newShareId = generateShareId();
-                    await saveAudit({
-                      tools_data: entries,
-                      total_spend: result.totalMonthlySpend,
-                      total_savings: result.totalMonthlySavings,
-                      findings: result.findings,
-                      team_size: teamSize,
-                      use_case: useCase,
-                      share_id: newShareId,
-                    });
-                    // Store shareId in state for later use
-                    setShareId(newShareId);
-                  } catch (err) {
-                    console.error('Failed to save audit:', err);
-                  }
                 }}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
               >
@@ -325,23 +283,25 @@ export default function Home() {
               <div className="space-y-4">
                 <h3 className="text-xl font-semibold text-white">Recommendations</h3>
                 {auditResult.findings.map((finding: any, index: number) => (
-                  <div
-                    key={index}
-                    className={`rounded-lg p-4 border ${finding.severity === 'high'
-                      ? 'bg-red-500/10 border-red-500/30'
-                      : finding.severity === 'medium'
+                  <div 
+                    key={index} 
+                    className={`rounded-lg p-4 border ${
+                      finding.severity === 'high' 
+                        ? 'bg-red-500/10 border-red-500/30' 
+                        : finding.severity === 'medium'
                         ? 'bg-yellow-500/10 border-yellow-500/30'
                         : 'bg-blue-500/10 border-blue-500/30'
-                      }`}
+                    }`}
                   >
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-semibold text-white">{finding.tool}</h4>
-                      <span className={`text-xs px-2 py-1 rounded ${finding.severity === 'high'
-                        ? 'bg-red-500/20 text-red-400'
-                        : finding.severity === 'medium'
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        finding.severity === 'high' 
+                          ? 'bg-red-500/20 text-red-400' 
+                          : finding.severity === 'medium'
                           ? 'bg-yellow-500/20 text-yellow-400'
                           : 'bg-blue-500/20 text-blue-400'
-                        }`}>
+                      }`}>
                         {finding.severity.toUpperCase()}
                       </span>
                     </div>
@@ -363,77 +323,6 @@ export default function Home() {
                 <p className="text-slate-400">{auditResult?.summary}</p>
               </div>
             )}
-
-            {/* AI Summary */}
-            <div className="bg-slate-800/80 rounded-xl p-6 border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
-                <span className="text-cyan-400">✨</span> AI Executive Summary
-              </h3>
-              {isLoadingSummary ? (
-                <div className="animate-pulse space-y-2">
-                  <div className="h-4 bg-slate-700 rounded w-3/4"></div>
-                  <div className="h-4 bg-slate-700 rounded w-full"></div>
-                  <div className="h-4 bg-slate-700 rounded w-5/6"></div>
-                </div>
-              ) : (
-                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
-                  {aiSummary}
-                </p>
-              )}
-            </div>
-
-            {/* Email Capture */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mt-6 mb-6">
-              <h3 className="text-lg font-semibold mb-2">Save your audit</h3>
-              <p className="text-slate-400 text-sm mb-4">Get your results via email and a shareable link.</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Company name (optional)"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
-                />
-              </div>
-              
-              <button
-                onClick={async () => {
-                  if (!email) return;
-                  try {
-                    await saveAudit({
-                      tools_data: entries,
-                      total_spend: auditResult.totalMonthlySpend,
-                      total_savings: auditResult.totalMonthlySavings,
-                      findings: auditResult.findings,
-                      email,
-                      company_name: companyName,
-                      team_size: teamSize,
-                      use_case: useCase,
-                      share_id: shareId || generateShareId(),
-                    });
-                    setEmailCaptured(true);
-                  } catch (err) {
-                    console.error('Failed to save:', err);
-                  }
-                }}
-                disabled={!email}
-                className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 text-white px-6 py-2 rounded-lg transition-colors"
-              >
-                Save & Email Results
-              </button>
-              
-              {emailCaptured && (
-                <p className="text-green-400 mt-2">✓ Saved! Check your email.</p>
-              )}
-            </div>
 
             {/* Back Button */}
             <button
