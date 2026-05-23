@@ -69,6 +69,8 @@ export default function Home() {
   // NEW: State for audit results
   const [auditResult, setAuditResult] = useState<any>(null);
   const [showResults, setShowResults] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string>('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('creditlens_form');
@@ -253,10 +255,32 @@ export default function Home() {
             {/* Run Audit Button */}
             {entries.length > 0 && (
               <button 
-                onClick={() => {
+                onClick={async () => {
                   const result = runAudit(entries, teamSize, useCase);
                   setAuditResult(result);
                   setShowResults(true);
+                  
+                  // Fetch AI summary
+                  if (result.findings.length > 0) {
+                    setAiLoading(true);
+                    try {
+                      const summaryRes = await fetch('/api/summary', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          findings: result.findings,
+                          totalSavings: result.totalMonthlySavings,
+                          tools: entries,
+                        }),
+                      });
+                      const summaryData = await summaryRes.json();
+                      setAiSummary(summaryData.summary);
+                    } catch (err) {
+                      console.error('AI summary failed:', err);
+                    } finally {
+                      setAiLoading(false);
+                    }
+                  }
                 }}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
               >
@@ -277,6 +301,20 @@ export default function Home() {
                 ${Math.round((auditResult?.totalAnnualSavings || 0)).toLocaleString()} / year
               </p>
             </div>
+
+            {/* AI Summary */}
+            {aiLoading && (
+              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
+                <p className="text-slate-400 italic">Generating AI summary...</p>
+              </div>
+            )}
+
+            {aiSummary && !aiLoading && (
+              <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30 mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-purple-400">🤖 AI Summary</h3>
+                <p className="text-slate-300 italic">"{aiSummary}"</p>
+              </div>
+            )}
 
             {/* Findings */}
             {auditResult && auditResult.findings.length > 0 ? (

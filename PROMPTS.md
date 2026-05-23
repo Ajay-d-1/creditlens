@@ -6,16 +6,15 @@
 **Why Groq instead of Anthropic:** Anthropic requires paid API access. Groq offers generous free tier with comparable model quality.
 
 ### Prompt Template
-```
+
 Generate a concise, helpful 100-word summary for a startup founder about their AI tool spend audit.
 
 Audit findings:
-{findings_list}
+- {tool_name}: {reason} (Save ${savings}/mo)
 
 Total potential savings: ${totalSavings}/month.
 
 Write in a friendly, actionable tone. Focus on the biggest opportunity and give one specific next step.
-```
 
 ### Why this prompt structure:
 - **Context first:** Tells the model who the reader is (startup founder)
