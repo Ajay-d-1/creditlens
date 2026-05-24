@@ -1,4 +1,4 @@
-﻿# Development Log
+# Development Log
 
 ## Day 1 — 2026-05-20
 **Hours worked:** 4
@@ -86,3 +86,29 @@ oute.ts = API endpoint
 - Add Open Graph meta tags for link previews
 - Set up Resend for transactional emails
 - Integrate Anthropic API for AI-generated summary
+
+## Day 4 — 2026-05-24
+**Hours worked:** 4
+**What I did:**
+- Fixed Vercel deployment after Git auth issues (used manual deploy)
+- Added shareable URL page (`/audit/[id]`) with Open Graph meta tags
+- Integrated Groq AI summary with graceful fallback
+- Created PROMPTS.md documenting LLM prompt engineering
+- Added all missing documentation: TESTS.md, GTM.md, ECONOMICS.md, LANDING_COPY.md, METRICS.md, REFLECTION.md
+- Set up GitHub Actions CI/CD pipeline
+
+**What I learned:**
+- Vercel manual deploy bypasses Git auth issues
+- Environment variables must be set in Vercel dashboard, not just .env.local
+- Groq free tier is sufficient for MVP AI features
+- Documentation takes 40% of time but is 25% of score
+
+**Blockers:**
+- Need to add GROQ_API_KEY to Vercel for real AI responses
+- User interviews scheduled for tomorrow
+- Final exams in 1 day — time-constrained
+
+**Plan for tomorrow:**
+- Conduct 3 user interviews
+- Add Groq key to Vercel and test real AI summaries
+- Final polish and submit
