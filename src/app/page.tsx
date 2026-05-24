@@ -67,7 +67,7 @@ export default function Home() {
   const [useCase, setUseCase] = useState<string>('coding');
   
   // NEW: State for audit results
-  const [auditResult, setAuditResult] = useState<any>(null);
+  const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -76,6 +76,7 @@ export default function Home() {
     const saved = localStorage.getItem('creditlens_form');
     if (saved) {
       const parsed = JSON.parse(saved);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntries(parsed.entries || []);
       setTeamSize(parsed.teamSize || 1);
       setUseCase(parsed.useCase || 'coding');
@@ -175,7 +176,7 @@ export default function Home() {
 
               {entries.length === 0 ? (
                 <p className="text-slate-500 text-center py-8">
-                  No tools added yet. Click "Add Tool" to start your audit.
+                  No tools added yet. Click &quot;Add Tool&quot; to start your audit.
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -312,7 +313,7 @@ export default function Home() {
             {aiSummary && !aiLoading && (
               <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30 mb-6">
                 <h3 className="text-lg font-semibold mb-2 text-purple-400">🤖 AI Summary</h3>
-                <p className="text-slate-300 italic">"{aiSummary}"</p>
+                <p className="text-slate-300 italic">&quot;{aiSummary}&quot;</p>
               </div>
             )}
 
@@ -320,7 +321,7 @@ export default function Home() {
             {auditResult && auditResult.findings.length > 0 ? (
               <div className="space-y-4">
                 <h3 className="text-xl font-semibold text-white">Recommendations</h3>
-                {auditResult.findings.map((finding: any, index: number) => (
+                {auditResult.findings.map((finding: { tool: string; severity: string; reason: string; currentPlan: string; recommendedPlan: string; savings: number }, index: number) => (
                   <div 
                     key={index} 
                     className={`rounded-lg p-4 border ${
@@ -357,7 +358,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="bg-green-500/10 rounded-xl p-6 text-center border border-green-500/30">
-                <p className="text-green-400 text-lg font-semibold mb-2">You're all set!</p>
+                <p className="text-green-400 text-lg font-semibold mb-2">You&apos;re all set!</p>
                 <p className="text-slate-400">{auditResult?.summary}</p>
               </div>
             )}

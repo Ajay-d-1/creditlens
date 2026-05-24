@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { getAuditByShareId } from '@/lib/database';
+import Link from 'next/link';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -74,7 +75,7 @@ export default async function AuditPage({ params }: PageProps) {
         {findings.length > 0 ? (
           <div className="space-y-4">
             <h3 className="text-xl font-semibold text-white">Recommendations</h3>
-            {findings.map((finding: any, index: number) => (
+            {findings.map((finding: { tool: string; severity: string; reason: string; currentPlan: string; recommendedPlan: string; savings: number }, index: number) => (
               <div 
                 key={index} 
                 className={`rounded-lg p-4 border ${
@@ -112,12 +113,12 @@ export default async function AuditPage({ params }: PageProps) {
         )}
 
         <div className="mt-8 text-center">
-          <a 
+          <Link 
             href="/" 
             className="inline-block bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold px-8 py-3 rounded-xl"
           >
             Audit Your Own Stack →
-          </a>
+          </Link>
         </div>
       </div>
     </main>

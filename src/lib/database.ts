@@ -1,13 +1,13 @@
 import { supabase } from './supabase';
-import { AuditResult } from './audit-engine';
+// removed unused AuditResult import
 
 export interface AuditRecord {
   id?: string;
   created_at?: string;
-  tools_data: any[];
+  tools_data: Record<string, unknown>[];
   total_spend: number;
   total_savings: number;
-  findings: any[];
+  findings: Record<string, unknown>[];
   email?: string;
   company_name?: string;
   role?: string;
