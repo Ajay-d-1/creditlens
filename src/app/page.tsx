@@ -58,6 +58,38 @@ const TOOLS = {
 
 const USE_CASES = ['coding', 'writing', 'data', 'research', 'mixed'];
 
+const TOOL_LINKS: Record<string, string> = {
+  'Cursor': 'https://cursor.sh/pricing',
+  'GitHub Copilot': 'https://github.com/features/copilot',
+  'Claude': 'https://claude.ai/upgrade',
+  'ChatGPT': 'https://openai.com/chatgpt/pricing',
+  'Anthropic API': 'https://www.anthropic.com/pricing',
+  'OpenAI API': 'https://openai.com/pricing',
+  'Gemini': 'https://one.google.com/about/plans',
+  'Windsurf': 'https://windsurf.com/pricing',
+};
+
+function ApplyFixButton({ toolName }: { toolName: string }) {
+  const [opening, setOpening] = useState(false);
+
+  const handleClick = () => {
+    setOpening(true);
+    const link = TOOL_LINKS[toolName] || 'https://google.com/search?q=' + encodeURIComponent(toolName + ' pricing');
+    window.open(link, '_blank');
+    setTimeout(() => setOpening(false), 1000);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-400 transition-colors hover:bg-cyan-500/20"
+    >
+      {opening ? 'Opening...' : 'Apply Fix'}
+    </button>
+  );
+}
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
@@ -255,11 +287,14 @@ export default function Home() {
                   Team Size
                 </label>
                 <input
-                  type="number"
-                  min={1}
+                  type="text"
+                  inputMode="numeric"
                   placeholder="e.g. 5"
-                  value={teamSize}
-                  onChange={(e) => setTeamSize(Math.max(1, parseInt(e.target.value) || 1))}
+                  value={teamSize === 0 ? '' : teamSize}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    setTeamSize(raw === '' ? 0 : parseInt(raw));
+                  }}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none transition-colors"
                 />
               </div>
@@ -360,10 +395,13 @@ export default function Home() {
                       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Seats</span>
                       <div className="flex items-center gap-1.5">
                         <input
-                          type="number"
-                          min={1}
-                          value={entry.seats}
-                          onChange={(e) => updateEntry(entry.id, 'seats', Math.max(1, parseInt(e.target.value) || 1))}
+                          type="text"
+                          inputMode="numeric"
+                          value={entry.seats === 0 ? '' : entry.seats}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9]/g, '');
+                            updateEntry(entry.id, 'seats', raw === '' ? 0 : parseInt(raw));
+                          }}
                           className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-2 text-center text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
                         />
                         <span className="text-xs text-gray-400">seats</span>
@@ -514,12 +552,7 @@ export default function Home() {
                         <span className="font-mono text-xs text-slate-500">
                           {finding.currentPlan} → <span className="font-semibold text-white">{finding.recommendedPlan}</span>
                         </span>
-                        <button
-                          type="button"
-                          className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-400 transition-colors hover:bg-cyan-500/20"
-                        >
-                          Apply Fix
-                        </button>
+                        <ApplyFixButton toolName={finding.tool} />
                       </div>
                     </div>
                   );

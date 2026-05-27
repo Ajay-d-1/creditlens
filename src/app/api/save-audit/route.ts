@@ -34,10 +34,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as SaveAuditRequestBody;
 
-    const honeypotValue = body.b_address;
-    if (honeypotValue && honeypotValue.trim().length > 0) {
-      return NextResponse.json({ error: 'Bot detected' }, { status: 400 });
-    }
+    // const honeypotValue = body.b_address;
+    // if (honeypotValue && honeypotValue.trim().length > 0) {
+    //   return NextResponse.json({ error: 'Bot detected' }, { status: 400 });
+    // }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
