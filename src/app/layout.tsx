@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,17 +25,17 @@ export default function RootLayout({
         <header className="sticky top-0 z-50 shrink-0 border-b border-[#1e293b] bg-[#0f172a]/95 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
             <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-cyan-400 tracking-tight">CreditLens</span>
+              <Link href="/" className="text-lg font-bold text-cyan-400 tracking-tight">CreditLens</Link>
               <span className="hidden sm:inline-block border-l border-[#334155] pl-3 text-[11px] uppercase tracking-[0.12em] text-slate-500">
                 Built for Credex
               </span>
             </div>
             <nav className="flex items-center gap-5 text-sm">
-              <span className="hidden sm:inline text-slate-500 cursor-default">Dashboard</span>
-              <span className="text-cyan-400 cursor-default border-b border-cyan-400 pb-0.5">
+              <Link href="/dashboard" className="hidden sm:inline text-slate-500 hover:text-cyan-400 transition-colors">Dashboard</Link>
+              <Link href="/" className="text-cyan-400 border-b border-cyan-400 pb-0.5">
                 Audits
-              </span>
-              <span className="hidden sm:inline text-slate-500 cursor-default">Reports</span>
+              </Link>
+              <Link href="/reports" className="hidden sm:inline text-slate-500 hover:text-cyan-400 transition-colors">Reports</Link>
             </nav>
           </div>
         </header>
