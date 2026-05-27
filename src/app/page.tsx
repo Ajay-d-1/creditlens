@@ -88,7 +88,7 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('');
-  const [website, setWebsite] = useState('');
+  const [b_address, setB_address] = useState('');
   const [emailCaptured, setEmailCaptured] = useState(false);
   const [shareId, setShareId] = useState('');
   const [savingAudit, setSavingAudit] = useState(false);
@@ -186,7 +186,7 @@ export default function Home() {
           email,
           companyName,
           role,
-          website,
+          b_address,
           toolsData: entries,
           totalSpend: auditResult.totalMonthlySpend,
           totalSavings: auditResult.totalMonthlySavings,
@@ -566,10 +566,10 @@ export default function Home() {
               <form onSubmit={handleEmailSubmit} className="space-y-3">
                 <input
                   type="text"
-                  name="website"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  className="absolute -left-[9999px]"
+                  name="b_address"
+                  value={b_address}
+                  onChange={(e) => setB_address(e.target.value)}
+                  style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}
                   tabIndex={-1}
                   autoComplete="off"
                   aria-hidden="true"

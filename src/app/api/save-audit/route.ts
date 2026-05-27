@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SaveAuditRequestBody {
-  website?: string;
+  b_address?: string;
   email?: string;
   companyName?: string;
   role?: string;
@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as SaveAuditRequestBody;
 
-    if (body.website) {
+    const honeypotValue = body.b_address;
+    if (honeypotValue && honeypotValue.trim().length > 0) {
       return NextResponse.json({ error: 'Bot detected' }, { status: 400 });
     }
 
