@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Trash2, Sparkles } from 'lucide-react';
 import { ShareAuditButton } from '@/components/ShareAuditButton';
 import { runAudit, type AuditFinding, type AuditResult } from '@/lib/audit-engine';
 
@@ -229,39 +230,47 @@ export default function Home() {
     ? `creditlens-navy.vercel.app/audit/${shareId}`
     : 'Save your report to generate a shareable link';
 
+  /* ─────────────────────────────────────────────
+   *  FORM VIEW  (Mockup 1 — white content card)
+   * ───────────────────────────────────────────── */
   if (!showResults) {
     return (
-      <main className="min-h-screen bg-[#0f172a] pb-20">
-        <div className="pt-16 pb-10 text-center">
-          <h1 className="mb-3 text-4xl font-bold text-white">
-            Audit your AI tool spend
-          </h1>
-          <p className="text-lg text-slate-400">
-            Find savings instantly. Free for any team.
-          </p>
-        </div>
+      <div className="flex-1 bg-white">
+        <div className="mx-auto max-w-3xl px-4 py-12 md:py-16">
+          {/* Hero heading */}
+          <div className="mb-10 text-center">
+            <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-4xl">
+              Audit your AI tool spend
+            </h1>
+            <p className="text-gray-400">
+              Find savings instantly. Free for any team.
+            </p>
+          </div>
 
-        <div className="mx-auto max-w-3xl space-y-4 px-4">
-          <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-6">
-            <h2 className="mb-4 font-semibold text-white">Team Information</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* ── Team Information ── */}
+          <div className="border-t border-gray-200 pt-8 pb-8">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm text-slate-400">Team Size</label>
+                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+                  Team Size
+                </label>
                 <input
                   type="number"
                   min={1}
                   placeholder="e.g. 5"
                   value={teamSize}
                   onChange={(e) => setTeamSize(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-slate-400">Primary Use Case</label>
+                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+                  Primary Use Case
+                </label>
                 <select
                   value={useCase}
                   onChange={(e) => setUseCase(e.target.value)}
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-white focus:border-cyan-500/50 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none transition-colors"
                 >
                   {USE_CASES.map((uc) => (
                     <option key={uc} value={uc}>
@@ -273,142 +282,157 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold text-white">AI Tools</h2>
+          {/* ── AI Tools Section ── */}
+          <div className="border-t border-gray-200 pt-6">
+            {/* Add Tool button */}
+            <div className="mb-5 flex justify-end">
               <button
                 type="button"
                 onClick={addEntry}
-                className="flex items-center gap-1 rounded-lg bg-cyan-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-cyan-400"
+                className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500 transition-colors hover:text-cyan-600"
               >
-                + Add Tool
+                <span className="text-base leading-none">+</span> Add Tool
               </button>
             </div>
 
+            {/* Column headers + rows */}
             {entries.length > 0 && (
-              <div className="space-y-3 md:space-y-0">
-                <div className="mb-2 hidden grid-cols-[2fr_2fr_1.5fr_1fr_auto] gap-3 border-b border-[#334155] pb-2 text-xs uppercase tracking-wide text-slate-400 md:grid">
-                  <span>Tool</span>
-                  <span>Plan</span>
-                  <span>Spend</span>
-                  <span>Seats</span>
+              <>
+                <div className="mb-1 hidden border-b border-gray-200 pb-2 md:grid md:grid-cols-[2fr_2fr_1.5fr_1fr_36px] md:gap-4">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Tool</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Plan</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Spend</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Seats</span>
                   <span />
                 </div>
 
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="grid grid-cols-1 gap-3 rounded-lg border border-[#334155] bg-[#0f172a]/50 p-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_auto] md:border-0 md:bg-transparent md:p-0 md:py-2"
+                    className="grid grid-cols-1 gap-3 border-b border-gray-100 py-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_36px] md:items-center md:gap-4"
                   >
-                    <label className="block">
-                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
-                        Tool
-                      </span>
+                    {/* Tool select */}
+                    <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Tool</span>
                       <select
                         value={entry.tool}
                         onChange={(e) => updateEntry(entry.id, 'tool', e.target.value)}
-                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
                       >
                         {Object.entries(TOOLS).map(([key, tool]) => (
                           <option key={key} value={key}>{tool.name}</option>
                         ))}
                       </select>
-                    </label>
+                    </div>
 
-                    <label className="block">
-                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
-                        Plan
-                      </span>
+                    {/* Plan select */}
+                    <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Plan</span>
                       <select
                         value={entry.plan}
                         onChange={(e) => updateEntry(entry.id, 'plan', e.target.value)}
-                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
                       >
                         {TOOLS[entry.tool as keyof typeof TOOLS].plans.map((plan) => (
                           <option key={plan} value={plan}>{plan}</option>
                         ))}
                       </select>
-                    </label>
+                    </div>
 
-                    <label className="block">
-                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
-                        Spend
-                      </span>
+                    {/* Spend input */}
+                    <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Spend</span>
                       <input
                         type="number"
                         min={0}
                         value={entry.monthlySpend}
                         onChange={(e) => updateEntry(entry.id, 'monthlySpend', Math.max(0, parseFloat(e.target.value) || 0))}
-                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
-                        placeholder="0"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:outline-none"
+                        placeholder="$0"
                       />
-                      <p className="mt-1 text-xs text-slate-500">Enter your total monthly bill for this tool</p>
-                    </label>
+                    </div>
 
-                    <label className="block">
-                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
-                        Seats
-                      </span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={entry.seats}
-                        onChange={(e) => updateEntry(entry.id, 'seats', Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none"
-                      />
-                    </label>
+                    {/* Seats */}
+                    <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Seats</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={1}
+                          value={entry.seats}
+                          onChange={(e) => updateEntry(entry.id, 'seats', Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-2 text-center text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
+                        />
+                        <span className="text-xs text-gray-400">seats</span>
+                      </div>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeEntry(entry.id)}
-                      className="rounded-lg border border-red-500/30 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
-                    >
-                      Remove
-                    </button>
+                    {/* Delete */}
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => removeEntry(entry.id)}
+                        className="rounded p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
+                        aria-label="Remove tool"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                 ))}
-              </div>
+              </>
             )}
 
             {entries.length === 0 && (
-              <div className="py-10 text-center text-slate-400">
-                <p>Add the AI tools your team pays for.</p>
-                <p className="mt-1 text-sm">We&apos;ll find where you&apos;re overspending.</p>
+              <div className="py-14 text-center">
+                <p className="text-gray-400">Add the AI tools your team pays for.</p>
+                <p className="mt-1 text-sm text-gray-300">We&apos;ll find where you&apos;re overspending.</p>
               </div>
             )}
 
+            {/* Total spend */}
             {entries.length > 0 && (
-              <div className="mt-4 flex items-center justify-between border-t border-[#334155] pt-4">
-                <span className="text-xs uppercase tracking-wide text-slate-400">
+              <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
                   Total Monthly Spend
                 </span>
-                <span className="text-lg font-bold text-cyan-400">
+                <span className="text-xl font-bold text-cyan-500">
                   ${totalSpend.toLocaleString()}
                 </span>
               </div>
             )}
           </div>
 
-          <button
-            type="button"
-            disabled={entries.length === 0}
-            onClick={runAuditAndSummarize}
-            className="w-full rounded-xl border-2 border-dashed py-4 text-lg font-semibold transition-all disabled:cursor-not-allowed disabled:border-slate-600 disabled:text-slate-500 disabled:opacity-40 enabled:border-cyan-500 enabled:text-white enabled:hover:bg-cyan-500/10"
-          >
-            {entries.length === 0 ? 'Add at least one tool to run audit' : 'Run Audit →'}
-          </button>
+          {/* Run Audit button */}
+          <div className="mt-10">
+            <button
+              type="button"
+              disabled={entries.length === 0}
+              onClick={runAuditAndSummarize}
+              className="w-full rounded-xl border-2 border-dashed py-4 text-lg font-semibold transition-all
+                disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-300
+                enabled:border-cyan-500/60 enabled:text-cyan-600 enabled:hover:border-cyan-500 enabled:hover:bg-cyan-50"
+            >
+              {entries.length === 0 ? 'Add at least one tool to run audit' : 'Run Audit →'}
+            </button>
+          </div>
         </div>
-      </main>
+      </div>
     );
   }
 
+  /* ─────────────────────────────────────────────
+   *  RESULTS VIEW  (Mockup 2 — dark theme)
+   * ───────────────────────────────────────────── */
   return (
-    <main className="min-h-screen bg-[#0f172a] pb-20">
+    <div className="flex-1 pb-20">
       <div className="mx-auto max-w-6xl px-4 pt-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
-          <div className="space-y-4">
-            <div className="rounded-xl bg-green-500 p-8 text-center">
-              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-900">
+          {/* ── Left column ── */}
+          <div className="space-y-5">
+            {/* Green savings banner */}
+            <div className="rounded-xl bg-gradient-to-br from-green-500 to-green-600 p-8 text-center shadow-lg shadow-green-900/30">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-green-950">
                 Potential Monthly Savings
               </p>
               <p className="mb-2 text-5xl font-black text-white lg:text-7xl">
@@ -419,10 +443,11 @@ export default function Home() {
               </p>
             </div>
 
+            {/* Amber CTA */}
             {totalSavings > 500 && (
               <div className="flex flex-col gap-4 rounded-xl bg-amber-500 p-5 md:flex-row md:items-center md:justify-between">
                 <p className="font-medium text-amber-950">
-                  Your team could save ${totalSavings.toLocaleString()}/mo — Credex offers discounted AI credits that capture these savings directly.
+                  Your team could save ${totalSavings.toLocaleString()}/mo — Credex offers discounted AI credits...
                 </p>
                 <a
                   href={`mailto:hello@credex.rocks?subject=${encodeURIComponent(`CreditLens Audit — $${totalSavings}/mo savings opportunity`)}`}
@@ -433,24 +458,26 @@ export default function Home() {
               </div>
             )}
 
-            <div className="rounded-xl border border-indigo-800/50 bg-indigo-950/50 p-6">
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-indigo-300">
-                <span>✦</span> AI Summary
+            {/* AI Summary */}
+            <div className="card-accent rounded-xl border border-[#334155] bg-[#1e293b] p-6">
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-cyan-300">
+                <Sparkles size={16} className="text-cyan-400" />
+                AI Summary
               </h3>
               {aiLoading ? (
-                <div className="space-y-2 animate-pulse">
-                  <div className="h-4 w-full rounded bg-indigo-900/50" />
-                  <div className="h-4 w-5/6 rounded bg-indigo-900/50" />
-                  <div className="h-4 w-4/6 rounded bg-indigo-900/50" />
+                <div className="animate-pulse space-y-2">
+                  <div className="h-4 w-full rounded bg-slate-700" />
+                  <div className="h-4 w-5/6 rounded bg-slate-700" />
+                  <div className="h-4 w-4/6 rounded bg-slate-700" />
                 </div>
               ) : (
-                <p className="leading-relaxed text-slate-300">{summary}</p>
+                <p className="text-sm leading-relaxed text-slate-300">{summary}</p>
               )}
             </div>
 
             <div className="border-t border-[#334155]" />
 
-            <h3 className="text-lg font-semibold text-white">Recommendations</h3>
+            {/* Recommendations */}
             {findings.length > 0 ? (
               <div className="space-y-3">
                 {findings.map((finding) => {
@@ -459,12 +486,12 @@ export default function Home() {
                   return (
                     <div
                       key={`${finding.tool}-${finding.currentPlan}-${finding.recommendedPlan}`}
-                      className="rounded-xl border border-[#334155] bg-[#1e293b] p-5"
+                      className="card-accent rounded-xl border border-[#334155] bg-[#1e293b] p-5"
                     >
                       <div className="mb-2 flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-white">{finding.tool}</span>
-                          <span className={`rounded px-2 py-0.5 text-xs font-bold ${
+                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                             priority === 'HIGH'
                               ? 'bg-red-500/20 text-red-400'
                               : priority === 'MEDIUM'
@@ -482,11 +509,11 @@ export default function Home() {
                       <p className="mb-3 text-sm text-slate-400">{finding.reason}</p>
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-mono text-xs text-slate-500">
-                          {finding.currentPlan} → {finding.recommendedPlan}
+                          {finding.currentPlan} → <span className="font-semibold text-white">{finding.recommendedPlan}</span>
                         </span>
                         <button
                           type="button"
-                          className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-400 transition-colors hover:bg-cyan-500/20"
+                          className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-400 transition-colors hover:bg-cyan-500/20"
                         >
                           Apply Fix
                         </button>
@@ -522,7 +549,9 @@ export default function Home() {
             </p>
           </div>
 
+          {/* ── Right sidebar ── */}
           <div className="space-y-4">
+            {/* Share card */}
             <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
               <h3 className="mb-3 font-semibold text-white">Share your audit</h3>
               <div className="mb-3 flex gap-2">
@@ -533,7 +562,7 @@ export default function Home() {
                   <ShareAuditButton
                     url={shareUrl}
                     idleLabel="⎘ Copy"
-                    className="whitespace-nowrap rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 transition-colors hover:bg-cyan-500/20"
+                    className="whitespace-nowrap rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20"
                   />
                 ) : (
                   <button
@@ -548,12 +577,13 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setShowResults(false)}
-                className="w-full rounded-lg border border-[#334155] py-2 text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-300"
+                className="w-full rounded-lg border border-[#334155] py-2 text-center text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-300"
               >
                 ← Start New Audit
               </button>
             </div>
 
+            {/* Save report card */}
             <div
               ref={emailCaptureRef}
               className="rounded-xl border border-[#334155] bg-[#1e293b] p-5"
@@ -564,6 +594,7 @@ export default function Home() {
               </p>
 
               <form onSubmit={handleEmailSubmit} className="space-y-3">
+                {/* Honeypot */}
                 <input
                   type="text"
                   name="b_address"
@@ -574,6 +605,7 @@ export default function Home() {
                   autoComplete="off"
                   aria-hidden="true"
                 />
+
                 <input
                   ref={emailInputRef}
                   type="email"
@@ -581,21 +613,21 @@ export default function Home() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email"
                   required
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
                 />
                 <input
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Company (optional)"
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                  placeholder="Company"
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
                 />
                 <input
                   type="text"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  placeholder="Role (optional)"
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                  placeholder="Role"
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
                 />
 
                 {captureError && (
@@ -632,6 +664,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

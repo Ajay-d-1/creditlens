@@ -20,21 +20,45 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#0f172a]">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#334155] bg-[#0f172a] px-6 py-3">
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-bold text-cyan-400">CreditLens</span>
-            <span className="rounded border border-[#334155] px-2 py-0.5 text-xs text-slate-400">
-              Built for Credex
-            </span>
+      <body className="min-h-screen flex flex-col bg-[#0f172a]">
+        <header className="sticky top-0 z-50 shrink-0 border-b border-[#1e293b] bg-[#0f172a]/95 backdrop-blur-md">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-bold text-cyan-400 tracking-tight">CreditLens</span>
+              <span className="hidden sm:inline-block border-l border-[#334155] pl-3 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+                Built for Credex
+              </span>
+            </div>
+            <nav className="flex items-center gap-5 text-sm">
+              <span className="hidden sm:inline text-slate-500 cursor-default">Dashboard</span>
+              <span className="text-cyan-400 cursor-default border-b border-cyan-400 pb-0.5">
+                Audits
+              </span>
+              <span className="hidden sm:inline text-slate-500 cursor-default">Reports</span>
+            </nav>
           </div>
-          <nav className="flex gap-6 text-sm text-slate-400">
-            <span className="cursor-pointer border-b border-cyan-400 pb-1 text-cyan-400">
-              Audits
-            </span>
-          </nav>
         </header>
-        {children}
+
+        <main className="flex-1 flex flex-col">{children}</main>
+
+        <footer className="shrink-0 border-t border-[#1e293b] bg-[#0f172a] px-6 py-4">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 sm:flex-row">
+            <p className="text-xs text-slate-600">
+              © 2024 CreditLens AI. All rights reserved.
+            </p>
+            <div className="flex gap-5 text-xs">
+              <a href="#" className="text-cyan-600/60 hover:text-cyan-400 transition-colors">
+                Privacy Policy
+              </a>
+              <a href="#" className="text-cyan-600/60 hover:text-cyan-400 transition-colors">
+                Terms of Service
+              </a>
+              <a href="#" className="text-cyan-600/60 hover:text-cyan-400 transition-colors">
+                Contact Support
+              </a>
+            </div>
+          </div>
+        </footer>
       </body>
     </html>
   );
