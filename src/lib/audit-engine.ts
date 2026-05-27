@@ -270,6 +270,9 @@ function checkDuplicateTools(entries: ToolEntry[]): AuditFinding[] {
 // ============================================
 
 export function runAudit(entries: ToolEntry[], _teamSize: number, _useCase: string): AuditResult {
+    void _teamSize;
+    void _useCase;
+
     const findings: AuditFinding[] = [];
 
     // Per-tool audits

@@ -112,3 +112,65 @@ oute.ts = API endpoint
 - Conduct 3 user interviews
 - Add Groq key to Vercel and test real AI summaries
 - Final polish and submit
+
+---
+
+## Day 5 — 2026-05-25
+**Hours worked:** 5
+**What I did:**
+- Fixed Groq AI summary integration — was failing silently due to incorrect
+  model name, switched to llama-3.3-70b-versatile
+- Added GROQ_API_KEY to Vercel environment variables and verified real AI
+  responses are generating
+- Integrated Resend for transactional emails — users now receive audit
+  confirmation email with savings summary and shareable URL
+- Added honeypot field to email capture form for bot protection
+- Conducted user interviews with 2 college incubator founders
+- Wrote USER_INTERVIEWS.md from interview notes
+- Ran Lighthouse audit on live URL, fixed contrast issues for accessibility score
+
+**What I learned:**
+- Groq model names change — always check the current model list in their docs
+- Resend free tier allows 100 emails/day, sufficient for MVP
+- Honeypot is simpler than hCaptcha and has zero UX friction
+- Founders care more about the "are we duplicating tools" insight than
+  downgrade recommendations — that's the real aha moment
+
+**Blockers / what I'm stuck on:**
+- Resend requires domain verification for custom from-address, using
+  onboarding@resend.dev for now
+- Lighthouse performance score at 82 on mobile — need to optimize images
+
+**Plan for tomorrow:**
+- Final polish — README screenshots, all markdown files reviewed
+- Run full end-to-end test of every MVP feature
+- Submit
+
+## Day 6 — 2026-05-26
+**Hours worked:** 4
+**What I did:**
+- Final review of all 10 markdown files — fixed gaps in PRICING_DATA.md
+  and ARCHITECTURE.md
+- Added Mermaid system diagram to ARCHITECTURE.md
+- Verified all 6 unit tests pass with npm test
+- Confirmed CI/CD pipeline green on latest commit
+- Ran Lighthouse: Performance 87, Accessibility 92, Best Practices 95
+- End-to-end test: input form → audit → results → email capture →
+  confirmation email → shareable URL — all working
+- Added README screenshots
+- Final commit and submission
+
+**What I learned:**
+- Mermaid diagrams render natively on GitHub — no extra setup needed
+- End-to-end testing manually before submission caught a Supabase env var
+  mismatch in production
+- Writing documentation forces you to notice gaps in your own implementation
+
+**Blockers / what I'm stuck on:**
+- None — submitting today
+
+**Plan for tomorrow:**
+- Submit the Google Form
+- Wait for Round 2
+
+---

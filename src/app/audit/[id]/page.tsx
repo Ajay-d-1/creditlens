@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { getAuditByShareId } from '@/lib/database';
 import Link from 'next/link';
+import { ShareAuditButton } from '@/components/ShareAuditButton';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -55,6 +56,8 @@ export default async function AuditPage({ params }: PageProps) {
   const findings = audit.findings || [];
   const totalSavings = Math.round(audit.total_savings || 0);
   const totalAnnual = totalSavings * 12;
+  const shareUrl = `https://creditlens-navy.vercel.app/audit/${id}`;
+  const credexSubject = encodeURIComponent(`CreditLens Audit — $${totalSavings}/mo savings opportunity`);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -70,6 +73,30 @@ export default async function AuditPage({ params }: PageProps) {
           <p className="text-green-400 text-sm uppercase tracking-wide mb-2">Potential Monthly Savings</p>
           <p className="text-5xl font-bold text-white mb-2">${totalSavings.toLocaleString()}</p>
           <p className="text-slate-400">${totalAnnual.toLocaleString()} / year</p>
+        </div>
+
+        {totalSavings > 500 && (
+          <div className="mb-8 rounded-xl border border-amber-400/40 bg-amber-500/15 p-5">
+            <p className="mb-4 text-amber-100">
+              Your team could save ${totalSavings.toLocaleString()}/mo — Credex offers discounted AI credits that capture these savings directly.
+            </p>
+            <a
+              href={`mailto:hello@credex.rocks?subject=${credexSubject}`}
+              className="inline-block rounded-lg bg-amber-300 px-5 py-3 font-semibold text-slate-950 transition-colors hover:bg-amber-200"
+            >
+              Book a Credex Consultation →
+            </a>
+          </div>
+        )}
+
+        <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800/50 p-5">
+          <p className="mb-3 text-sm text-slate-400">Shareable URL</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <p className="min-w-0 flex-1 break-all rounded-lg border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
+              {shareUrl}
+            </p>
+            <ShareAuditButton url={shareUrl} />
+          </div>
         </div>
 
         {findings.length > 0 ? (
@@ -111,6 +138,10 @@ export default async function AuditPage({ params }: PageProps) {
             <p className="text-green-400 text-lg font-semibold">Well optimized!</p>
           </div>
         )}
+
+        <p className="mt-8 text-center text-sm text-slate-500">
+          Audited by CreditLens · creditlens-navy.vercel.app
+        </p>
 
         <div className="mt-8 text-center">
           <Link 

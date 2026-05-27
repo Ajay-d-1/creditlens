@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Plus, Trash2, ChevronDown, Calculator } from 'lucide-react';
+import { ShareAuditButton } from '@/components/ShareAuditButton';
 import { runAudit, AuditResult } from '@/lib/audit-engine';
 
 interface ToolEntry {
@@ -61,16 +62,34 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
+function getToolName(toolKey: string): string {
+  return TOOLS[toolKey as keyof typeof TOOLS]?.name || toolKey;
+}
+
+function formatToolsList(tools: ToolEntry[]): string {
+  return tools
+    .map((entry) => `${getToolName(entry.tool)} ${entry.plan}`)
+    .join(', ');
+}
+
 export default function Home() {
   const [entries, setEntries] = useState<ToolEntry[]>([]);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [useCase, setUseCase] = useState<string>('coding');
-  
-  // NEW: State for audit results
+
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [website, setWebsite] = useState('');
+  const [emailCaptured, setEmailCaptured] = useState(false);
+  const [shareId, setShareId] = useState('');
+  const [savingAudit, setSavingAudit] = useState(false);
+  const [captureError, setCaptureError] = useState('');
+  const emailCaptureRef = useRef<HTMLDivElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('creditlens_form');
@@ -108,7 +127,69 @@ export default function Home() {
     setEntries(entries.filter(entry => entry.id !== id));
   }
 
+  async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auditResult) return;
+
+    setSavingAudit(true);
+    setCaptureError('');
+
+    try {
+      const saveRes = await fetch('/api/save-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          companyName,
+          website,
+          tools: entries,
+          totalSpend: auditResult.totalMonthlySpend,
+          totalSavings: auditResult.totalMonthlySavings,
+          findings: auditResult.findings,
+          teamSize,
+          useCase,
+        }),
+      });
+
+      const saveData = await saveRes.json();
+
+      if (!saveRes.ok || !saveData.shareId) {
+        throw new Error(saveData.error || 'Could not save audit');
+      }
+
+      setShareId(saveData.shareId);
+      setEmailCaptured(true);
+
+      try {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            totalSavings: auditResult.totalMonthlySavings,
+            toolsList: formatToolsList(entries),
+            shareId: saveData.shareId,
+          }),
+        });
+      } catch (error) {
+        console.warn('Confirmation email failed silently:', error);
+      }
+    } catch (error) {
+      console.error('Lead capture failed:', error);
+      setCaptureError('We could not save your audit yet. Please try again.');
+    } finally {
+      setSavingAudit(false);
+    }
+  }
+
+  function focusEmailCapture() {
+    emailCaptureRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    emailInputRef.current?.focus();
+  }
+
   const totalSpend = entries.reduce((sum, entry) => sum + (entry.monthlySpend || 0), 0);
+  const totalSavings = Math.round(auditResult?.totalMonthlySavings || 0);
+  const shareUrl = shareId ? `https://creditlens-navy.vercel.app/audit/${shareId}` : '';
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -138,6 +219,7 @@ export default function Home() {
                   <input
                     type="number"
                     min={1}
+                    placeholder="e.g. 5"
                     value={teamSize}
                     onChange={(e) => setTeamSize(Math.max(1, parseInt(e.target.value) || 1))}
                     className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
@@ -176,7 +258,7 @@ export default function Home() {
 
               {entries.length === 0 ? (
                 <p className="text-slate-500 text-center py-8">
-                  No tools added yet. Click &quot;Add Tool&quot; to start your audit.
+                  Add the AI tools your team pays for. We&apos;ll find where you&apos;re overspending.
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -218,6 +300,7 @@ export default function Home() {
                           className="w-full bg-slate-600 rounded-lg px-3 py-2 text-white border border-slate-500 focus:border-cyan-400 focus:outline-none"
                           placeholder="0"
                         />
+                        <p className="mt-1 text-xs text-slate-500">Enter your total monthly bill for this tool</p>
                       </div>
 
                       <div>
@@ -254,40 +337,51 @@ export default function Home() {
             </div>
 
             {/* Run Audit Button */}
-            {entries.length > 0 && (
-              <button 
-                onClick={async () => {
-                  const result = runAudit(entries, teamSize, useCase);
-                  setAuditResult(result);
-                  setShowResults(true);
-                  
-                  // Fetch AI summary
-                  if (result.findings.length > 0) {
-                    setAiLoading(true);
-                    try {
-                      const summaryRes = await fetch('/api/summary', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          findings: result.findings,
-                          totalSavings: result.totalMonthlySavings,
-                          tools: entries,
-                        }),
-                      });
-                      const summaryData = await summaryRes.json();
-                      setAiSummary(summaryData.summary);
-                    } catch (err) {
-                      console.error('AI summary failed:', err);
-                    } finally {
-                      setAiLoading(false);
-                    }
-                  }
-                }}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.02]"
-              >
-                Run Audit →
-              </button>
-            )}
+            <button
+              disabled={entries.length === 0}
+              onClick={async () => {
+                if (entries.length === 0) return;
+
+                const result = runAudit(entries, teamSize, useCase);
+                setAuditResult(result);
+                setShowResults(true);
+
+                setEmailCaptured(false);
+                setShareId('');
+                setCaptureError('');
+
+                // Fetch AI summary
+                setAiLoading(true);
+                try {
+                  const topFinding = result.findings[0];
+                  const summaryRes = await fetch('/api/summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      findings: result.findings,
+                      totalSpend: result.totalMonthlySpend,
+                      totalSavings: result.totalMonthlySavings,
+                      teamSize,
+                      useCase,
+                      tools: entries,
+                      toolsList: formatToolsList(entries),
+                      topRecommendation: topFinding
+                        ? `${topFinding.tool}: ${topFinding.reason} Save $${Math.round(topFinding.savings)}/mo.`
+                        : 'No major savings recommendation found',
+                    }),
+                  });
+                  const summaryData = await summaryRes.json();
+                  setAiSummary(summaryData.summary);
+                } catch (err) {
+                  console.error('AI summary failed:', err);
+                } finally {
+                  setAiLoading(false);
+                }
+              }}
+              className="w-full transform rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-4 text-lg font-semibold text-white transition-all hover:scale-[1.02] hover:from-cyan-600 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+            >
+              {entries.length === 0 ? 'Add at least one tool to run audit' : 'Run Audit →'}
+            </button>
           </>
         ) : (
           // RESULTS VIEW
@@ -296,12 +390,26 @@ export default function Home() {
             <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl p-8 text-center border border-green-500/30">
               <p className="text-green-400 text-sm uppercase tracking-wide mb-2">Potential Monthly Savings</p>
               <p className="text-5xl font-bold text-white mb-2">
-                ${Math.round(auditResult?.totalMonthlySavings || 0).toLocaleString()}
+                ${totalSavings.toLocaleString()}
               </p>
               <p className="text-slate-400">
                 ${Math.round((auditResult?.totalAnnualSavings || 0)).toLocaleString()} / year
               </p>
             </div>
+
+            {totalSavings > 500 && (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-5">
+                <p className="mb-4 text-amber-100">
+                  Your team could save ${totalSavings.toLocaleString()}/mo — Credex offers discounted AI credits that capture these savings directly.
+                </p>
+                <a
+                  href={`mailto:hello@credex.rocks?subject=${encodeURIComponent(`CreditLens Audit — $${totalSavings}/mo savings opportunity`)}`}
+                  className="inline-block rounded-lg bg-amber-300 px-5 py-3 font-semibold text-slate-950 transition-colors hover:bg-amber-200"
+                >
+                  Book a Credex Consultation →
+                </a>
+              </div>
+            )}
 
             {/* AI Summary */}
             {aiLoading && (
@@ -312,8 +420,8 @@ export default function Home() {
 
             {aiSummary && !aiLoading && (
               <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30 mb-6">
-                <h3 className="text-lg font-semibold mb-2 text-purple-400">🤖 AI Summary</h3>
-                <p className="text-slate-300 italic">&quot;{aiSummary}&quot;</p>
+                <h3 className="text-lg font-semibold mb-2 text-purple-400">AI Summary</h3>
+                <p className="text-slate-300">{aiSummary}</p>
               </div>
             )}
 
@@ -363,12 +471,116 @@ export default function Home() {
               </div>
             )}
 
+            <p className="text-center text-sm text-slate-500">
+              Audited by CreditLens · creditlens-navy.vercel.app
+            </p>
+
+            {totalSavings < 100 && (
+              <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-5 text-center">
+                <p className="mb-4 text-sm text-slate-300">
+                  You&apos;re spending efficiently. We&apos;ll notify you when better options appear for your stack.
+                </p>
+                <button
+                  type="button"
+                  onClick={focusEmailCapture}
+                  className="rounded-lg border border-slate-500 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:border-cyan-400 hover:text-cyan-300"
+                >
+                  Notify me
+                </button>
+              </div>
+            )}
+
+            {/* Email Capture */}
+            <div ref={emailCaptureRef} className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+              {emailCaptured ? (
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Audit saved</h3>
+                  <p className="text-slate-300 mb-4">
+                    Your confirmation email is on its way.
+                  </p>
+                  {shareUrl && (
+                    <div className="space-y-4">
+                      <p className="break-all rounded-lg border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
+                        {shareUrl}
+                      </p>
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <a
+                          href={`/audit/${shareId}`}
+                          className="inline-block rounded-lg bg-cyan-500 px-5 py-3 text-center font-semibold text-white transition-colors hover:bg-cyan-600"
+                        >
+                          View Shareable Report
+                        </a>
+                        <ShareAuditButton url={shareUrl} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <form onSubmit={handleEmailSubmit} className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-1">Get your audit report</h3>
+                    <p className="text-sm text-slate-400">
+                      Save this audit and receive the shareable report link by email.
+                    </p>
+                  </div>
+
+                  <input
+                    type="text"
+                    name="website"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    className="honeypot-field"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Email</label>
+                      <input
+                        ref={emailInputRef}
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
+                        placeholder="founder@company.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Company name</label>
+                      <input
+                        type="text"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+
+                  {captureError && (
+                    <p className="text-sm text-red-400">{captureError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={savingAudit}
+                    className="w-full bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
+                  >
+                    {savingAudit ? 'Saving...' : 'Email My Report'}
+                  </button>
+                </form>
+              )}
+            </div>
+
             {/* Back Button */}
             <button
               onClick={() => setShowResults(false)}
               className="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg transition-colors"
             >
-              ← Back to Form
+              ← Start New Audit
             </button>
           </div>
         )}
