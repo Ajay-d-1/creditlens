@@ -283,13 +283,43 @@ export function runAudit(entries: ToolEntry[], _teamSize: number, _useCase: stri
         // Skip if monthly spend is 0 (free plan or not entered)
         if (entry.monthlySpend === 0) continue;
 
+        let ruleFired = false;
+
         // Rule 1: Minimum seat check
         const minSeatFinding = checkMinimumSeats(entry, toolData);
-        if (minSeatFinding) findings.push(minSeatFinding);
+        if (minSeatFinding) {
+            findings.push(minSeatFinding);
+            ruleFired = true;
+        }
 
         // Rule 2: Plan overkill check
         const overkillFinding = checkPlanOverkill(entry, toolData);
-        if (overkillFinding) findings.push(overkillFinding);
+        if (overkillFinding) {
+            findings.push(overkillFinding);
+            ruleFired = true;
+        }
+
+        // Rule 3: Overage check (Fallback)
+        if (!ruleFired) {
+            const planData = toolData.plans[entry.plan];
+            if (planData && planData.pricePerSeat > 0) {
+                const officialPrice = planData.pricePerSeat * Math.max(1, entry.seats);
+                if (entry.monthlySpend > officialPrice * 1.5) {
+                    const savings = entry.monthlySpend - officialPrice;
+                    findings.push({
+                        tool: toolData.name,
+                        currentPlan: entry.plan,
+                        currentSpend: entry.monthlySpend,
+                        recommendedPlan: 'Review billing',
+                        recommendedSpend: officialPrice,
+                        savings,
+                        savingsPercent: Math.round((savings / entry.monthlySpend) * 100),
+                        reason: `You're reporting $${entry.monthlySpend}/mo but the standard ${entry.plan} price is $${officialPrice}/mo. Verify your billing or check for usage overages.`,
+                        severity: 'medium',
+                    });
+                }
+            }
+        }
     }
 
     // Cross-tool audits
