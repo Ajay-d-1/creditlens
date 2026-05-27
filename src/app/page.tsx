@@ -343,10 +343,13 @@ export default function Home() {
                     <div>
                       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Spend</span>
                       <input
-                        type="number"
-                        min={0}
-                        value={entry.monthlySpend}
-                        onChange={(e) => updateEntry(entry.id, 'monthlySpend', Math.max(0, parseFloat(e.target.value) || 0))}
+                        type="text"
+                        inputMode="decimal"
+                        value={entry.monthlySpend === 0 ? '' : entry.monthlySpend}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9.]/g, '');
+                          updateEntry(entry.id, 'monthlySpend', raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0));
+                        }}
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:outline-none"
                         placeholder="$0"
                       />
