@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Plus, Trash2, ChevronDown, Calculator } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ShareAuditButton } from '@/components/ShareAuditButton';
-import { runAudit, AuditResult } from '@/lib/audit-engine';
+import { runAudit, type AuditFinding, type AuditResult } from '@/lib/audit-engine';
 
 interface ToolEntry {
   id: string;
@@ -72,17 +71,23 @@ function formatToolsList(tools: ToolEntry[]): string {
     .join(', ');
 }
 
+function getSeverityLabel(finding: AuditFinding): 'HIGH' | 'MEDIUM' | 'LOW' {
+  if (finding.severity === 'high') return 'HIGH';
+  if (finding.severity === 'medium') return 'MEDIUM';
+  return 'LOW';
+}
+
 export default function Home() {
   const [entries, setEntries] = useState<ToolEntry[]>([]);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [useCase, setUseCase] = useState<string>('coding');
-
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [role, setRole] = useState('');
   const [website, setWebsite] = useState('');
   const [emailCaptured, setEmailCaptured] = useState(false);
   const [shareId, setShareId] = useState('');
@@ -118,13 +123,52 @@ export default function Home() {
   }
 
   function updateEntry(id: string, field: keyof ToolEntry, value: string | number) {
-    setEntries(entries.map(entry => 
+    setEntries(entries.map((entry) =>
       entry.id === id ? { ...entry, [field]: value } : entry
     ));
   }
 
   function removeEntry(id: string) {
-    setEntries(entries.filter(entry => entry.id !== id));
+    setEntries(entries.filter((entry) => entry.id !== id));
+  }
+
+  async function runAuditAndSummarize() {
+    if (entries.length === 0) return;
+
+    const result = runAudit(entries, teamSize, useCase);
+    setAuditResult(result);
+    setShowResults(true);
+    setEmailCaptured(false);
+    setShareId('');
+    setCaptureError('');
+
+    setAiLoading(true);
+    try {
+      const topFinding = result.findings[0];
+      const summaryRes = await fetch('/api/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          findings: result.findings,
+          totalSpend: result.totalMonthlySpend,
+          totalSavings: result.totalMonthlySavings,
+          teamSize,
+          useCase,
+          tools: entries,
+          toolsList: formatToolsList(entries),
+          topRecommendation: topFinding
+            ? `${topFinding.tool}: ${topFinding.reason} Save $${Math.round(topFinding.savings)}/mo.`
+            : 'No major savings recommendation found',
+        }),
+      });
+      const summaryData = await summaryRes.json();
+      setAiSummary(summaryData.summary || result.summary);
+    } catch (err) {
+      console.error('AI summary failed:', err);
+      setAiSummary(result.summary);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
@@ -141,8 +185,9 @@ export default function Home() {
         body: JSON.stringify({
           email,
           companyName,
+          role,
           website,
-          tools: entries,
+          toolsData: entries,
           totalSpend: auditResult.totalMonthlySpend,
           totalSavings: auditResult.totalMonthlySavings,
           findings: auditResult.findings,
@@ -154,29 +199,16 @@ export default function Home() {
       const saveData = await saveRes.json();
 
       if (!saveRes.ok || !saveData.shareId) {
-        throw new Error(saveData.error || 'Could not save audit');
+        throw new Error(saveData.details || saveData.error || 'Could not save audit');
       }
 
       setShareId(saveData.shareId);
       setEmailCaptured(true);
-
-      try {
-        await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            totalSavings: auditResult.totalMonthlySavings,
-            toolsList: formatToolsList(entries),
-            shareId: saveData.shareId,
-          }),
-        });
-      } catch (error) {
-        console.warn('Confirmation email failed silently:', error);
-      }
     } catch (error) {
       console.error('Lead capture failed:', error);
-      setCaptureError('We could not save your audit yet. Please try again.');
+      setCaptureError(
+        'Having trouble saving — your audit results are still shown above. Try again or copy the link manually.'
+      );
     } finally {
       setSavingAudit(false);
     }
@@ -189,401 +221,416 @@ export default function Home() {
 
   const totalSpend = entries.reduce((sum, entry) => sum + (entry.monthlySpend || 0), 0);
   const totalSavings = Math.round(auditResult?.totalMonthlySavings || 0);
+  const totalAnnualSavings = totalSavings * 12;
+  const findings = auditResult?.findings || [];
+  const summary = aiSummary || auditResult?.summary || '';
   const shareUrl = shareId ? `https://creditlens-navy.vercel.app/audit/${shareId}` : '';
+  const visibleShareUrl = shareId
+    ? `creditlens-navy.vercel.app/audit/${shareId}`
+    : 'Save your report to generate a shareable link';
 
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            CreditLens
+  if (!showResults) {
+    return (
+      <main className="min-h-screen bg-[#0f172a] pb-20">
+        <div className="pt-16 pb-10 text-center">
+          <h1 className="mb-3 text-4xl font-bold text-white">
+            Audit your AI tool spend
           </h1>
-          <p className="text-slate-400 text-lg">
-            Audit your AI tool spend. Find savings instantly.
+          <p className="text-lg text-slate-400">
+            Find savings instantly. Free for any team.
           </p>
         </div>
 
-        {!showResults ? (
-          // FORM VIEW
-          <>
-            {/* Team Info */}
-            <div className="bg-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-cyan-400" />
-                Team Information
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Team Size</label>
-                  <input
-                    type="number"
-                    min={1}
-                    placeholder="e.g. 5"
-                    value={teamSize}
-                    onChange={(e) => setTeamSize(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Primary Use Case</label>
-                  <div className="relative">
-                    <select
-                      value={useCase}
-                      onChange={(e) => setUseCase(e.target.value)}
-                      className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none appearance-none"
-                    >
-                      {USE_CASES.map(uc => (
-                        <option key={uc} value={uc}>{uc.charAt(0).toUpperCase() + uc.slice(1)}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
+        <div className="mx-auto max-w-3xl space-y-4 px-4">
+          <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-6">
+            <h2 className="mb-4 font-semibold text-white">Team Information</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-slate-400">Team Size</label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 5"
+                  value={teamSize}
+                  onChange={(e) => setTeamSize(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                />
               </div>
-            </div>
-
-            {/* Tool Entries */}
-            <div className="bg-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">AI Tools</h2>
-                <button
-                  onClick={addEntry}
-                  className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-2 rounded-lg transition-colors"
+              <div>
+                <label className="mb-1 block text-sm text-slate-400">Primary Use Case</label>
+                <select
+                  value={useCase}
+                  onChange={(e) => setUseCase(e.target.value)}
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-white focus:border-cyan-500/50 focus:outline-none"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add Tool
-                </button>
-              </div>
-
-              {entries.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">
-                  Add the AI tools your team pays for. We&apos;ll find where you&apos;re overspending.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {entries.map((entry) => (
-                    <div key={entry.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end bg-slate-700/50 rounded-lg p-4">
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Tool</label>
-                        <select
-                          value={entry.tool}
-                          onChange={(e) => updateEntry(entry.id, 'tool', e.target.value)}
-                          className="w-full bg-slate-600 rounded-lg px-3 py-2 text-white border border-slate-500 focus:border-cyan-400 focus:outline-none"
-                        >
-                          {Object.entries(TOOLS).map(([key, tool]) => (
-                            <option key={key} value={key}>{tool.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Plan</label>
-                        <select
-                          value={entry.plan}
-                          onChange={(e) => updateEntry(entry.id, 'plan', e.target.value)}
-                          className="w-full bg-slate-600 rounded-lg px-3 py-2 text-white border border-slate-500 focus:border-cyan-400 focus:outline-none"
-                        >
-                          {TOOLS[entry.tool as keyof typeof TOOLS].plans.map(plan => (
-                            <option key={plan} value={plan}>{plan}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Monthly Spend ($)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={entry.monthlySpend}
-                          onChange={(e) => updateEntry(entry.id, 'monthlySpend', Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full bg-slate-600 rounded-lg px-3 py-2 text-white border border-slate-500 focus:border-cyan-400 focus:outline-none"
-                          placeholder="0"
-                        />
-                        <p className="mt-1 text-xs text-slate-500">Enter your total monthly bill for this tool</p>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Seats</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={entry.seats}
-                          onChange={(e) => updateEntry(entry.id, 'seats', Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full bg-slate-600 rounded-lg px-3 py-2 text-white border border-slate-500 focus:border-cyan-400 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <button
-                          onClick={() => removeEntry(entry.id)}
-                          className="w-full flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-2 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Remove
-                        </button>
-                      </div>
-                    </div>
+                  {USE_CASES.map((uc) => (
+                    <option key={uc} value={uc}>
+                      {uc.charAt(0).toUpperCase() + uc.slice(1)}
+                    </option>
                   ))}
-                </div>
-              )}
+                </select>
+              </div>
+            </div>
+          </div>
 
-              {entries.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-slate-600 flex justify-between items-center">
-                  <span className="text-slate-400">Total Monthly Spend</span>
-                  <span className="text-2xl font-bold text-cyan-400">${totalSpend.toLocaleString()}</span>
-                </div>
-              )}
+          <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold text-white">AI Tools</h2>
+              <button
+                type="button"
+                onClick={addEntry}
+                className="flex items-center gap-1 rounded-lg bg-cyan-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-cyan-400"
+              >
+                + Add Tool
+              </button>
             </div>
 
-            {/* Run Audit Button */}
-            <button
-              disabled={entries.length === 0}
-              onClick={async () => {
-                if (entries.length === 0) return;
+            {entries.length > 0 && (
+              <div className="space-y-3 md:space-y-0">
+                <div className="mb-2 hidden grid-cols-[2fr_2fr_1.5fr_1fr_auto] gap-3 border-b border-[#334155] pb-2 text-xs uppercase tracking-wide text-slate-400 md:grid">
+                  <span>Tool</span>
+                  <span>Plan</span>
+                  <span>Spend</span>
+                  <span>Seats</span>
+                  <span />
+                </div>
 
-                const result = runAudit(entries, teamSize, useCase);
-                setAuditResult(result);
-                setShowResults(true);
+                {entries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="grid grid-cols-1 gap-3 rounded-lg border border-[#334155] bg-[#0f172a]/50 p-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_auto] md:border-0 md:bg-transparent md:p-0 md:py-2"
+                  >
+                    <label className="block">
+                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
+                        Tool
+                      </span>
+                      <select
+                        value={entry.tool}
+                        onChange={(e) => updateEntry(entry.id, 'tool', e.target.value)}
+                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none"
+                      >
+                        {Object.entries(TOOLS).map(([key, tool]) => (
+                          <option key={key} value={key}>{tool.name}</option>
+                        ))}
+                      </select>
+                    </label>
 
-                setEmailCaptured(false);
-                setShareId('');
-                setCaptureError('');
+                    <label className="block">
+                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
+                        Plan
+                      </span>
+                      <select
+                        value={entry.plan}
+                        onChange={(e) => updateEntry(entry.id, 'plan', e.target.value)}
+                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none"
+                      >
+                        {TOOLS[entry.tool as keyof typeof TOOLS].plans.map((plan) => (
+                          <option key={plan} value={plan}>{plan}</option>
+                        ))}
+                      </select>
+                    </label>
 
-                // Fetch AI summary
-                setAiLoading(true);
-                try {
-                  const topFinding = result.findings[0];
-                  const summaryRes = await fetch('/api/summary', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      findings: result.findings,
-                      totalSpend: result.totalMonthlySpend,
-                      totalSavings: result.totalMonthlySavings,
-                      teamSize,
-                      useCase,
-                      tools: entries,
-                      toolsList: formatToolsList(entries),
-                      topRecommendation: topFinding
-                        ? `${topFinding.tool}: ${topFinding.reason} Save $${Math.round(topFinding.savings)}/mo.`
-                        : 'No major savings recommendation found',
-                    }),
-                  });
-                  const summaryData = await summaryRes.json();
-                  setAiSummary(summaryData.summary);
-                } catch (err) {
-                  console.error('AI summary failed:', err);
-                } finally {
-                  setAiLoading(false);
-                }
-              }}
-              className="w-full transform rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-4 text-lg font-semibold text-white transition-all hover:scale-[1.02] hover:from-cyan-600 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-            >
-              {entries.length === 0 ? 'Add at least one tool to run audit' : 'Run Audit →'}
-            </button>
-          </>
-        ) : (
-          // RESULTS VIEW
-          <div className="space-y-6">
-            {/* Hero Savings */}
-            <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl p-8 text-center border border-green-500/30">
-              <p className="text-green-400 text-sm uppercase tracking-wide mb-2">Potential Monthly Savings</p>
-              <p className="text-5xl font-bold text-white mb-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
+                        Spend
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={entry.monthlySpend}
+                        onChange={(e) => updateEntry(entry.id, 'monthlySpend', Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                        placeholder="0"
+                      />
+                      <p className="mt-1 text-xs text-slate-500">Enter your total monthly bill for this tool</p>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500 md:hidden">
+                        Seats
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={entry.seats}
+                        onChange={(e) => updateEntry(entry.id, 'seats', Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => removeEntry(entry.id)}
+                      className="rounded-lg border border-red-500/30 px-3 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {entries.length === 0 && (
+              <div className="py-10 text-center text-slate-400">
+                <p>Add the AI tools your team pays for.</p>
+                <p className="mt-1 text-sm">We&apos;ll find where you&apos;re overspending.</p>
+              </div>
+            )}
+
+            {entries.length > 0 && (
+              <div className="mt-4 flex items-center justify-between border-t border-[#334155] pt-4">
+                <span className="text-xs uppercase tracking-wide text-slate-400">
+                  Total Monthly Spend
+                </span>
+                <span className="text-lg font-bold text-cyan-400">
+                  ${totalSpend.toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            disabled={entries.length === 0}
+            onClick={runAuditAndSummarize}
+            className="w-full rounded-xl border-2 border-dashed py-4 text-lg font-semibold transition-all disabled:cursor-not-allowed disabled:border-slate-600 disabled:text-slate-500 disabled:opacity-40 enabled:border-cyan-500 enabled:text-white enabled:hover:bg-cyan-500/10"
+          >
+            {entries.length === 0 ? 'Add at least one tool to run audit' : 'Run Audit →'}
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#0f172a] pb-20">
+      <div className="mx-auto max-w-6xl px-4 pt-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-4">
+            <div className="rounded-xl bg-green-500 p-8 text-center">
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-green-900">
+                Potential Monthly Savings
+              </p>
+              <p className="mb-2 text-5xl font-black text-white lg:text-7xl">
                 ${totalSavings.toLocaleString()}
               </p>
-              <p className="text-slate-400">
-                ${Math.round((auditResult?.totalAnnualSavings || 0)).toLocaleString()} / year
+              <p className="font-medium text-green-900">
+                ${totalAnnualSavings.toLocaleString()} / year
               </p>
             </div>
 
             {totalSavings > 500 && (
-              <div className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-5">
-                <p className="mb-4 text-amber-100">
+              <div className="flex flex-col gap-4 rounded-xl bg-amber-500 p-5 md:flex-row md:items-center md:justify-between">
+                <p className="font-medium text-amber-950">
                   Your team could save ${totalSavings.toLocaleString()}/mo — Credex offers discounted AI credits that capture these savings directly.
                 </p>
                 <a
                   href={`mailto:hello@credex.rocks?subject=${encodeURIComponent(`CreditLens Audit — $${totalSavings}/mo savings opportunity`)}`}
-                  className="inline-block rounded-lg bg-amber-300 px-5 py-3 font-semibold text-slate-950 transition-colors hover:bg-amber-200"
+                  className="shrink-0 whitespace-nowrap rounded-lg bg-amber-950 px-4 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-900"
                 >
                   Book a Credex Consultation →
                 </a>
               </div>
             )}
 
-            {/* AI Summary */}
-            {aiLoading && (
-              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
-                <p className="text-slate-400 italic">Generating AI summary...</p>
-              </div>
-            )}
+            <div className="rounded-xl border border-indigo-800/50 bg-indigo-950/50 p-6">
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-indigo-300">
+                <span>✦</span> AI Summary
+              </h3>
+              {aiLoading ? (
+                <div className="space-y-2 animate-pulse">
+                  <div className="h-4 w-full rounded bg-indigo-900/50" />
+                  <div className="h-4 w-5/6 rounded bg-indigo-900/50" />
+                  <div className="h-4 w-4/6 rounded bg-indigo-900/50" />
+                </div>
+              ) : (
+                <p className="leading-relaxed text-slate-300">{summary}</p>
+              )}
+            </div>
 
-            {aiSummary && !aiLoading && (
-              <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30 mb-6">
-                <h3 className="text-lg font-semibold mb-2 text-purple-400">AI Summary</h3>
-                <p className="text-slate-300">{aiSummary}</p>
-              </div>
-            )}
+            <div className="border-t border-[#334155]" />
 
-            {/* Findings */}
-            {auditResult && auditResult.findings.length > 0 ? (
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-white">Recommendations</h3>
-                {auditResult.findings.map((finding: { tool: string; severity: string; reason: string; currentPlan: string; recommendedPlan: string; savings: number }, index: number) => (
-                  <div 
-                    key={index} 
-                    className={`rounded-lg p-4 border ${
-                      finding.severity === 'high' 
-                        ? 'bg-red-500/10 border-red-500/30' 
-                        : finding.severity === 'medium'
-                        ? 'bg-yellow-500/10 border-yellow-500/30'
-                        : 'bg-blue-500/10 border-blue-500/30'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-semibold text-white">{finding.tool}</h4>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        finding.severity === 'high' 
-                          ? 'bg-red-500/20 text-red-400' 
-                          : finding.severity === 'medium'
-                          ? 'bg-yellow-500/20 text-yellow-400'
-                          : 'bg-blue-500/20 text-blue-400'
-                      }`}>
-                        {finding.severity.toUpperCase()}
-                      </span>
+            <h3 className="text-lg font-semibold text-white">Recommendations</h3>
+            {findings.length > 0 ? (
+              <div className="space-y-3">
+                {findings.map((finding) => {
+                  const priority = getSeverityLabel(finding);
+
+                  return (
+                    <div
+                      key={`${finding.tool}-${finding.currentPlan}-${finding.recommendedPlan}`}
+                      className="rounded-xl border border-[#334155] bg-[#1e293b] p-5"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-white">{finding.tool}</span>
+                          <span className={`rounded px-2 py-0.5 text-xs font-bold ${
+                            priority === 'HIGH'
+                              ? 'bg-red-500/20 text-red-400'
+                              : priority === 'MEDIUM'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-green-500/20 text-green-400'
+                          }`}
+                          >
+                            {priority}
+                          </span>
+                        </div>
+                        <span className="shrink-0 font-bold text-green-400">
+                          Save ${Math.round(finding.savings)}/mo
+                        </span>
+                      </div>
+                      <p className="mb-3 text-sm text-slate-400">{finding.reason}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-mono text-xs text-slate-500">
+                          {finding.currentPlan} → {finding.recommendedPlan}
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-400 transition-colors hover:bg-cyan-500/20"
+                        >
+                          Apply Fix
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-slate-300 text-sm mb-2">{finding.reason}</p>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">
-                        {finding.currentPlan} → {finding.recommendedPlan}
-                      </span>
-                      <span className="text-green-400 font-semibold">
-                        Save ${Math.round(finding.savings)}/mo
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <div className="bg-green-500/10 rounded-xl p-6 text-center border border-green-500/30">
-                <p className="text-green-400 text-lg font-semibold mb-2">You&apos;re all set!</p>
-                <p className="text-slate-400">{auditResult?.summary}</p>
+              <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5 text-center">
+                <p className="font-semibold text-green-400">You&apos;re all set!</p>
+                <p className="mt-2 text-sm text-slate-400">{auditResult?.summary}</p>
               </div>
             )}
 
-            <p className="text-center text-sm text-slate-500">
-              Audited by CreditLens · creditlens-navy.vercel.app
-            </p>
-
             {totalSavings < 100 && (
-              <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-5 text-center">
+              <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5 text-center">
                 <p className="mb-4 text-sm text-slate-300">
                   You&apos;re spending efficiently. We&apos;ll notify you when better options appear for your stack.
                 </p>
                 <button
                   type="button"
                   onClick={focusEmailCapture}
-                  className="rounded-lg border border-slate-500 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:border-cyan-400 hover:text-cyan-300"
+                  className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20"
                 >
                   Notify me
                 </button>
               </div>
             )}
 
-            {/* Email Capture */}
-            <div ref={emailCaptureRef} className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-              {emailCaptured ? (
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Audit saved</h3>
-                  <p className="text-slate-300 mb-4">
-                    Your confirmation email is on its way.
-                  </p>
-                  {shareUrl && (
-                    <div className="space-y-4">
-                      <p className="break-all rounded-lg border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
-                        {shareUrl}
-                      </p>
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        <a
-                          href={`/audit/${shareId}`}
-                          className="inline-block rounded-lg bg-cyan-500 px-5 py-3 text-center font-semibold text-white transition-colors hover:bg-cyan-600"
-                        >
-                          View Shareable Report
-                        </a>
-                        <ShareAuditButton url={shareUrl} />
-                      </div>
-                    </div>
-                  )}
+            <p className="pt-4 text-center text-xs text-slate-600">
+              Audited by CreditLens · creditlens-navy.vercel.app
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
+              <h3 className="mb-3 font-semibold text-white">Share your audit</h3>
+              <div className="mb-3 flex gap-2">
+                <div className="flex-1 truncate rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-slate-400">
+                  {visibleShareUrl}
                 </div>
-              ) : (
-                <form onSubmit={handleEmailSubmit} className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-1">Get your audit report</h3>
-                    <p className="text-sm text-slate-400">
-                      Save this audit and receive the shareable report link by email.
-                    </p>
-                  </div>
-
-                  <input
-                    type="text"
-                    name="website"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    className="honeypot-field"
-                    tabIndex={-1}
-                    autoComplete="off"
-                    aria-hidden="true"
+                {shareUrl ? (
+                  <ShareAuditButton
+                    url={shareUrl}
+                    idleLabel="⎘ Copy"
+                    className="whitespace-nowrap rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 transition-colors hover:bg-cyan-500/20"
                   />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-1">Email</label>
-                      <input
-                        ref={emailInputRef}
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
-                        placeholder="founder@company.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-slate-400 mb-1">Company name</label>
-                      <input
-                        type="text"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full bg-slate-700 rounded-lg px-4 py-2 text-white border border-slate-600 focus:border-cyan-400 focus:outline-none"
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
-
-                  {captureError && (
-                    <p className="text-sm text-red-400">{captureError}</p>
-                  )}
-
+                ) : (
                   <button
-                    type="submit"
-                    disabled={savingAudit}
-                    className="w-full bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
+                    type="button"
+                    disabled
+                    className="whitespace-nowrap rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-500"
                   >
-                    {savingAudit ? 'Saving...' : 'Email My Report'}
+                    ⎘ Copy
                   </button>
-                </form>
-              )}
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResults(false)}
+                className="w-full rounded-lg border border-[#334155] py-2 text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-300"
+              >
+                ← Start New Audit
+              </button>
             </div>
 
-            {/* Back Button */}
-            <button
-              onClick={() => setShowResults(false)}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg transition-colors"
+            <div
+              ref={emailCaptureRef}
+              className="rounded-xl border border-[#334155] bg-[#1e293b] p-5"
             >
-              ← Start New Audit
-            </button>
+              <h3 className="mb-1 font-semibold text-white">Save your report</h3>
+              <p className="mb-4 text-sm text-slate-400">
+                Get the shareable link by email.
+              </p>
+
+              <form onSubmit={handleEmailSubmit} className="space-y-3">
+                <input
+                  type="text"
+                  name="website"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  className="absolute -left-[9999px]"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                />
+                <input
+                  ref={emailInputRef}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email"
+                  required
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Company (optional)"
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="Role (optional)"
+                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                />
+
+                {captureError && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                    <p className="text-xs text-red-300">{captureError}</p>
+                    <button
+                      type="submit"
+                      disabled={savingAudit}
+                      className="mt-2 text-xs font-semibold text-red-200 underline underline-offset-4 disabled:opacity-50"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
+
+                {emailCaptured && (
+                  <p className="text-xs text-green-400">
+                    ✓ Report sent to your email!
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={savingAudit}
+                  className="w-full rounded-lg bg-cyan-500 py-2.5 font-semibold text-white transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                >
+                  {savingAudit ? 'Saving...' : captureError ? 'Retry Save' : 'Get My Report'}
+                </button>
+                <p className="text-center text-xs text-slate-500">
+                  No spam. We&apos;ll reach out only for high-savings cases.
+                </p>
+              </form>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </main>
   );

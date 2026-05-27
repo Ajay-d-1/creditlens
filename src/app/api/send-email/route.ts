@@ -4,12 +4,37 @@ import { Resend } from 'resend';
 interface SendEmailRequestBody {
   email?: string;
   totalSavings?: number;
+  totalSpend?: number;
   toolsList?: string;
+  toolsData?: Array<{ name?: string; tool?: string; plan?: string }>;
   shareId?: string;
 }
 
+const TOOL_NAMES: Record<string, string> = {
+  cursor: 'Cursor',
+  copilot: 'GitHub Copilot',
+  claude: 'Claude',
+  chatgpt: 'ChatGPT',
+  anthropic_api: 'Anthropic API',
+  openai_api: 'OpenAI API',
+  gemini: 'Gemini',
+  windsurf: 'Windsurf',
+};
+
 function formatMoney(value: number): string {
   return `$${Math.round(value || 0).toLocaleString()}`;
+}
+
+function formatToolsList(body: SendEmailRequestBody): string {
+  if (body.toolsList) return body.toolsList;
+  if (!body.toolsData?.length) return 'Your AI tools';
+
+  return body.toolsData
+    .map((tool) => {
+      const name = tool.name || TOOL_NAMES[tool.tool || ''] || tool.tool;
+      return [name, tool.plan].filter(Boolean).join(' ');
+    })
+    .join(', ');
 }
 
 export async function POST(req: NextRequest) {
@@ -28,7 +53,7 @@ export async function POST(req: NextRequest) {
     const totalSavings = Math.round(body.totalSavings || 0);
     const monthlySavings = formatMoney(totalSavings);
     const annualSavings = formatMoney(totalSavings * 12);
-    const toolsList = body.toolsList || 'Your AI tools';
+    const toolsList = formatToolsList(body);
     const reportUrl = `https://creditlens-navy.vercel.app/audit/${body.shareId}`;
     const consultationLine = totalSavings > 500
       ? '\n\nOur team at Credex can help you capture these savings through discounted AI credits. Reply to this email to book a consultation.'
@@ -39,7 +64,7 @@ export async function POST(req: NextRequest) {
     await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: body.email,
-      subject: `Your AI Spend Audit — ${monthlySavings}/mo in potential savings found`,
+      subject: `Your AI Spend Audit - ${monthlySavings}/mo in potential savings found`,
       text: `Hi,
 
 Your CreditLens audit is complete.
@@ -51,7 +76,7 @@ Here's what we found:
 
 View your shareable audit report: ${reportUrl}${consultationLine}
 
-— CreditLens by Credex`,
+- CreditLens by Credex`,
     });
 
     return NextResponse.json({ sent: true });
