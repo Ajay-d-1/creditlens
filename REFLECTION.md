@@ -10,8 +10,18 @@ I'd add real-time pricing scraping instead of hardcoded data. Prices change freq
 
 ## 3. What was your biggest product insight from user interviews?
 
-[To be filled after interviews — preliminary hypothesis: users care more about monthly savings than annual. The monthly number is what they budget for.]
-
+The most valuable insight came from Jashwanth (Jaiva Technologies) who 
+immediately reframed Enterprise plans as "compliance purchases, not 
+feature purchases." Most founders conflate cost and compliance when 
+evaluating tiers — they upgrade to Enterprise because it sounds more 
+serious, not because they actually need SSO or audit logs. This 
+reframing changed the audit engine's enterprise recommendation logic: 
+it now surfaces two separate signals — seat count threshold AND 
+compliance need — instead of just seat count. The second insight from 
+Karthik was that duplicate tool detection is the highest-value finding 
+for solo developers. He was paying for both Cursor and Claude Code 
+without realising the overlap. The "you're paying twice" framing 
+resonates more than any downgrade recommendation.
 ## 4. How did you decide when to use AI vs. hardcoded rules?
 
 The brief required hardcoded rules for audit math — correct call. Pricing logic must be deterministic and explainable. I used AI only for summary generation, where creativity matters more than precision.

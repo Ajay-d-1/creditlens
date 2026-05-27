@@ -19,13 +19,19 @@
 3. Respond to follow-up: ~15%
 4. Paying customer: ~5%
 
-## $1M ARR in 18 Months
-- Target: $83K MRR
-- At $500/customer: 166 customers needed
-- At 5% conversion: 3,320 audits → 8,300 total (40% email capture)
-- **Monthly target: ~460 audits**
+## Path to $1M ARR
 
-## Key Assumptions
-- Viral coefficient: 0.3
-- Organic traffic grows 20% MoM
-- Credex sales converts 30% of qualified leads
+$1M ARR = $83K MRR from Credex credit sales.
+Average credit deal: $800/mo. Need 104 paying customers.
+
+Working backwards from the funnel:
+- 104 customers / 5% close rate = 2,080 consultations booked
+- 2,080 consultations / 15% booking rate = 13,867 emails captured  
+- 13,867 emails / 40% capture rate = 34,667 audits completed
+- At 460 audits/month growth rate: achievable in 18 months
+
+What has to be true:
+1. Audit-to-email rate holds at 40% (currently unverified)
+2. Credex sales team converts 5% of consultations (industry baseline)
+3. Organic growth compounds — each shared audit URL drives 0.3 new audits
+4. Pricing data stays current — stale data kills trust instantly
