@@ -265,6 +265,64 @@ function checkDuplicateTools(entries: ToolEntry[]): AuditFinding[] {
     return findings;
 }
 
+/**
+ * RULE 4: Spend vs known plan price sanity check
+ *
+ * Catches two cases:
+ * A) User pays significantly MORE than the known per-seat price × seats
+ *    → Billing anomaly or wrong plan selected
+ * B) User pays MORE THAN ZERO for a FREE plan
+ *    → They've entered wrong data or are being incorrectly billed
+ */
+function checkSpendVsKnownPrice(entry: ToolEntry, toolData: ToolPricing): AuditFinding | null {
+    // Skip API/usage-based tools — their spend is variable by design
+    if (toolData.apiPricing) return null;
+
+    const planData = toolData.plans[entry.plan];
+    if (!planData) return null;
+    if (entry.monthlySpend === 0) return null;
+
+    const officialPricePerSeat = planData.pricePerSeat;
+
+    // CASE A: Free/Hobby plan but non-zero spend entered
+    if (officialPricePerSeat === 0 && entry.monthlySpend > 0) {
+        return {
+            tool: toolData.name,
+            currentPlan: entry.plan,
+            currentSpend: entry.monthlySpend,
+            recommendedPlan: 'Verify billing',
+            recommendedSpend: 0,
+            savings: entry.monthlySpend,
+            savingsPercent: 100,
+            reason: `${toolData.name} ${entry.plan} is a free plan — it should cost $0/mo. You've entered $${entry.monthlySpend}/mo. Either your plan is wrong, you're on a paid tier without knowing it, or this spend belongs to a different tool. Review your billing immediately.`,
+            severity: entry.monthlySpend > 100 ? 'high' : 'medium',
+        };
+    }
+
+    // CASE B: Paid plan, but spend is way over the official per-seat price
+    if (officialPricePerSeat > 0) {
+        const officialTotal = officialPricePerSeat * Math.max(1, entry.seats);
+        const overspendThreshold = officialTotal * 1.4; // 40% above official = flag it
+
+        if (entry.monthlySpend > overspendThreshold) {
+            const savings = entry.monthlySpend - officialTotal;
+            return {
+                tool: toolData.name,
+                currentPlan: entry.plan,
+                currentSpend: entry.monthlySpend,
+                recommendedPlan: 'Verify billing',
+                recommendedSpend: officialTotal,
+                savings,
+                savingsPercent: Math.round((savings / entry.monthlySpend) * 100),
+                reason: `You're reporting $${entry.monthlySpend}/mo for ${toolData.name} ${entry.plan}, but the standard rate is $${officialPricePerSeat}/seat × ${entry.seats} seat(s) = $${officialTotal}/mo. You may be paying for unused seats, have usage overages, or are on the wrong plan.`,
+                severity: savings > 200 ? 'high' : 'medium',
+            };
+        }
+    }
+
+    return null;
+}
+
 // ============================================
 // MAIN AUDIT FUNCTION
 // ============================================
@@ -297,6 +355,17 @@ export function runAudit(entries: ToolEntry[], _teamSize: number, _useCase: stri
         if (overkillFinding) {
             findings.push(overkillFinding);
             ruleFired = true;
+        }
+
+        // Rule 4: Spend vs known price sanity check (runs independently — not blocked by ruleFired)
+        // This catches free-plan overspend AND paid-plan billing anomalies
+        // Only skip if Rule 1 or 2 already caught the same issue
+        if (!ruleFired) {
+            const priceCheckFinding = checkSpendVsKnownPrice(entry, toolData);
+            if (priceCheckFinding) {
+                findings.push(priceCheckFinding);
+                ruleFired = true;
+            }
         }
 
         // Rule 3: Overage check (Fallback)

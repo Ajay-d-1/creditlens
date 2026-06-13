@@ -111,13 +111,13 @@ export default async function AuditPage({ params }: PageProps) {
     audit = await getAuditByShareId(id);
   } catch {
     return (
-      <div className="flex flex-1 items-center justify-center text-white">
+      <div className="flex flex-1 items-center justify-center bg-white text-[#111110]">
         <div className="text-center">
           <h1 className="mb-2 text-2xl font-bold">Audit Not Found</h1>
-          <p className="text-slate-400">This audit link may have expired.</p>
+          <p className="text-[#605F5B]">This audit link may have expired.</p>
           <Link
             href="/"
-            className="mt-4 inline-block rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-400 transition-colors hover:bg-cyan-500/20"
+            className="cl-btn-ghost mt-4"
           >
             ← Start New Audit
           </Link>
@@ -141,19 +141,19 @@ export default async function AuditPage({ params }: PageProps) {
   const linkedInUrl = encodeURIComponent(shareUrl);
 
   return (
-    <div className="flex-1 pb-20">
-      <div className="mx-auto max-w-6xl px-4 pt-6">
+    <div className="flex-1 pb-20 overflow-y-auto">
+      <div className="mx-auto max-w-6xl px-6 pt-6">
         {/* ── Header bar ── */}
-        <div className="mb-6 flex flex-col gap-3 rounded-xl bg-[#1e293b] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex flex-col gap-3 cl-card p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EDE9FE]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6D28D9]">
                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Shared Audit Report</h1>
-              <p className="text-xs text-slate-400">
+              <h1 className="text-lg font-bold text-[#111110]">Shared Audit Report</h1>
+              <p className="text-xs text-[#605F5B]">
                 Generated for {companyName}{createdDate ? ` · ${createdDate}` : ''}
               </p>
             </div>
@@ -162,7 +162,7 @@ export default async function AuditPage({ params }: PageProps) {
             url={shareUrl}
             idleLabel="⎘ Copy Link"
             copiedLabel="✓ Copied!"
-            className="whitespace-nowrap rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20"
+            className="cl-btn-ghost whitespace-nowrap"
           />
         </div>
 
@@ -170,58 +170,58 @@ export default async function AuditPage({ params }: PageProps) {
           {/* ── Left column ── */}
           <div className="space-y-5">
             {/* Optimization Potential card */}
-            <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-6">
+            <div className="cl-card p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-400"><polyline points="20 6 9 17 4 12" /></svg>
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#D1FAE5]">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-[#059669]"><polyline points="20 6 9 17 4 12" /></svg>
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                    <span className="cl-label">
                       Optimization Potential Identified
                     </span>
                   </div>
-                  <p className="text-4xl font-black text-white md:text-5xl">
-                    ${totalSavings.toLocaleString()}.00 <span className="text-lg font-normal text-slate-400">/mo</span>
+                  <p className="text-4xl font-black text-[#111110] md:text-5xl">
+                    ${totalSavings.toLocaleString()}.00 <span className="text-lg font-normal text-[#605F5B]">/mo</span>
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#334155] px-3 py-1 text-xs text-slate-300">
-                    <span className="h-2 w-2 rounded-full bg-green-400" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E4DF] px-3 py-1 text-xs text-[#111110]">
+                    <span className="h-2 w-2 rounded-full bg-[#059669]" />
                     High Confidence
                   </span>
-                  <span className="text-sm text-slate-400">Est. Annual: ${totalAnnual.toLocaleString()}</span>
+                  <span className="text-sm text-[#605F5B]">Est. Annual: ${totalAnnual.toLocaleString()}</span>
                 </div>
               </div>
-              <p className="text-sm leading-relaxed text-slate-400">
+              <p className="text-sm leading-relaxed text-[#605F5B]">
                 Based on a deep audit of current infrastructure and SaaS expenditure, CreditLens AI has identified actionable savings across {findings.length} major {findings.length === 1 ? 'category' : 'categories'}.
               </p>
             </div>
 
             {/* AI Synthesis */}
-            <div className="card-accent rounded-xl border border-[#334155] bg-[#1e293b] p-6">
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-cyan-300">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400">
+            <div className="card-accent cl-card p-6 border-l-2 border-l-[#6D28D9]">
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#6D28D9]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6D28D9]">
                   <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
                 </svg>
                 AI Synthesis
               </h3>
-              <p className="text-sm leading-relaxed text-slate-300">
+              <p className="text-sm leading-relaxed text-[#111110]">
                 {synthesis}
               </p>
             </div>
 
             {/* Actionable Insights */}
-            <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-6">
-              <h3 className="mb-4 flex items-center gap-2 font-semibold text-white">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+            <div className="cl-card p-6">
+              <h3 className="mb-4 flex items-center gap-2 font-semibold text-[#111110]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#605F5B]">
                   <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="8" x2="16" y2="8" /><line x1="8" y1="16" x2="12" y2="16" />
                 </svg>
                 Actionable Insights
               </h3>
 
               {findings.length > 0 ? (
-                <div className="divide-y divide-[#334155]">
+                <div className="divide-y divide-[#E5E4DF]">
                   {findings.map((finding) => {
                     const priority = getPriority(finding);
                     return (
@@ -229,21 +229,21 @@ export default async function AuditPage({ params }: PageProps) {
                         key={`${finding.tool}-${finding.currentPlan}-${finding.recommendedPlan}`}
                         className="flex items-start gap-4 py-4 first:pt-0 last:pb-0"
                       >
-                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800">
+                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FAFAF8] border border-[#E5E4DF]">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={
-                            priority === 'HIGH' ? 'text-red-400' : priority === 'MEDIUM' ? 'text-amber-400' : 'text-green-400'
+                            priority === 'HIGH' ? 'text-[#DC2626]' : priority === 'MEDIUM' ? 'text-[#D97706]' : 'text-[#059669]'
                           }>
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                           </svg>
                         </div>
                         <div className="flex-1">
-                          <p className="font-semibold text-white">{finding.tool}</p>
-                          <p className="mt-0.5 text-sm text-slate-400">{finding.reason}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {finding.currentPlan} → <span className="font-semibold text-white">{finding.recommendedPlan}</span>
+                          <p className="font-semibold text-[#111110]">{finding.tool}</p>
+                          <p className="mt-0.5 text-sm text-[#605F5B]">{finding.reason}</p>
+                          <p className="mt-1 text-xs text-[#A19F99]">
+                            {finding.currentPlan} → <span className="font-semibold text-[#111110]">{finding.recommendedPlan}</span>
                           </p>
                         </div>
-                        <span className="shrink-0 font-semibold text-red-400">
+                        <span className="shrink-0 font-semibold text-[#DC2626]">
                           -${Math.round(finding.savings)}/mo
                         </span>
                       </div>
@@ -251,13 +251,13 @@ export default async function AuditPage({ params }: PageProps) {
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-[#605F5B]">
                   No significant optimization opportunities were identified. Your current stack is well-optimized.
                 </p>
               )}
             </div>
 
-            <p className="pt-2 text-center text-xs text-slate-600">
+            <p className="pt-2 text-center text-xs text-[#A19F99]">
               Audited by CreditLens · creditlens-navy.vercel.app
             </p>
           </div>
@@ -265,32 +265,32 @@ export default async function AuditPage({ params }: PageProps) {
           {/* ── Right sidebar ── */}
           <div className="space-y-4">
             {/* Social Preview */}
-            <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
+            <div className="cl-card p-5">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                <span className="cl-label">
                   Social Preview
                 </span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#A19F99]">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
                 </svg>
               </div>
 
               {/* Preview card mockup */}
-              <div className="overflow-hidden rounded-lg border border-[#334155] bg-[#0f172a]">
+              <div className="overflow-hidden rounded-lg border border-[#E5E4DF] bg-[#FAFAF8]">
                 <div className="flex flex-col items-center gap-1 px-4 py-6">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-cyan-400">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#6D28D9]">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                   </svg>
-                  <p className="mt-1 text-2xl font-black text-white">
-                    -${totalSavings.toLocaleString()}<span className="text-sm font-normal text-slate-400">/mo</span>
+                  <p className="mt-1 text-2xl font-black text-[#111110]">
+                    -${totalSavings.toLocaleString()}<span className="text-sm font-normal text-[#605F5B]">/mo</span>
                   </p>
                 </div>
-                <div className="border-t border-[#334155] px-4 py-3">
-                  <p className="mb-0.5 text-[10px] text-cyan-500">creditlens.ai</p>
-                  <p className="text-xs font-semibold text-slate-200">
+                <div className="border-t border-[#E5E4DF] px-4 py-3 bg-white">
+                  <p className="mb-0.5 text-[10px] text-[#6D28D9]">creditlens.ai</p>
+                  <p className="text-xs font-semibold text-[#111110]">
                     CreditLens | Potential Savings: ${totalSavings}/mo identified for {companyName}.
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
+                  <p className="mt-0.5 text-[11px] text-[#605F5B]">
                     View the full AI audit report to see actionable optimization recommendations.
                   </p>
                 </div>
@@ -302,7 +302,7 @@ export default async function AuditPage({ params }: PageProps) {
                   href={`https://twitter.com/intent/tweet?url=${tweetUrl}&text=${tweetText}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#334155] text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E4DF] text-[#605F5B] transition-colors hover:border-[#D4D3CE] hover:text-[#111110] bg-white"
                   aria-label="Share on X"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -313,7 +313,7 @@ export default async function AuditPage({ params }: PageProps) {
                   href={`https://www.linkedin.com/sharing/share-offsite/?url=${linkedInUrl}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#334155] text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E4DF] text-[#605F5B] transition-colors hover:border-[#D4D3CE] hover:text-[#111110] bg-white"
                   aria-label="Share on LinkedIn"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -324,24 +324,24 @@ export default async function AuditPage({ params }: PageProps) {
                   url={shareUrl}
                   idleLabel="🔗"
                   copiedLabel="✓"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#334155] text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E4DF] text-[#605F5B] transition-colors hover:border-[#D4D3CE] hover:text-[#111110] bg-white"
                 />
               </div>
             </div>
 
             {/* Data Points Analyzed */}
-            <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
+            <div className="cl-card p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#EDE9FE]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6D28D9]">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                  <p className="cl-label">
                     Data Points Analyzed
                   </p>
-                  <p className="text-2xl font-black text-white">{dataPoints}</p>
+                  <p className="text-2xl font-black text-[#111110]">{dataPoints}</p>
                 </div>
               </div>
             </div>
@@ -349,7 +349,7 @@ export default async function AuditPage({ params }: PageProps) {
             {/* Back to new audit */}
             <Link
               href="/"
-              className="block w-full rounded-lg border border-[#334155] py-2.5 text-center text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-300"
+              className="cl-btn-ghost block w-full text-center"
             >
               ← Start New Audit
             </Link>

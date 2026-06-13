@@ -1,14 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0f172a;
-  --foreground: #e2e8f0;
+  --background: #F4F4F1;
+  --foreground: #111110;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
+
+  /* CreditLens light theme tokens */
+  --color-cl-bg: #F4F4F1;
+  --color-cl-surface: #FFFFFF;
+  --color-cl-border: #E5E4DF;
+  --color-cl-border2: #D4D3CE;
+  --color-cl-violet: #6D28D9;
+  --color-cl-violet-light: #EDE9FE;
+  --color-cl-violet-text: #5B21B6;
+  --color-cl-green: #059669;
+  --color-cl-green-light: #D1FAE5;
+  --color-cl-amber: #D97706;
+  --color-cl-amber-light: #FEF3C7;
+  --color-cl-red: #DC2626;
+  --color-cl-red-light: #FEE2E2;
+  --color-cl-t1: #111110;
+  --color-cl-t2: #605F5B;
+  --color-cl-t3: #A19F99;
+  --color-cl-t4: #C8C6C0;
 }
 
 body {
@@ -17,36 +36,116 @@ body {
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
 }
 
-/* Honeypot field */
+/* ── CreditLens Utility Classes ── */
+
+.cl-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E4DF;
+  border-radius: 10px;
+}
+
+.cl-card-hover:hover {
+  border-color: #D4D3CE;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.cl-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #A19F99;
+}
+
+.cl-input {
+  background: #FAFAF8;
+  border: 1px solid #E5E4DF;
+  border-radius: 6px;
+  color: #111110;
+  font-size: 13px;
+  padding: 7px 10px;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+.cl-input:focus {
+  outline: none;
+  border-color: #6D28D9;
+  background: #FFFFFF;
+}
+
+.cl-btn-primary {
+  background: #6D28D9;
+  color: white;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cl-btn-primary:hover {
+  background: #5B21B6;
+}
+
+.cl-btn-primary:disabled {
+  background: #E5E4DF;
+  color: #A19F99;
+  cursor: not-allowed;
+}
+
+.cl-btn-ghost {
+  background: #FFFFFF;
+  color: #605F5B;
+  border: 1px solid #E5E4DF;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cl-btn-ghost:hover {
+  background: #F4F4F1;
+  border-color: #D4D3CE;
+}
+
+/* ── Honeypot field ── */
 .honeypot-field {
   position: absolute;
   left: -9999px;
 }
 
-/* Left accent border for cards */
+/* ── Card accent (violet) ── */
 .card-accent {
-  border-left: 3px solid #22d3ee;
+  border-left: 3px solid #6D28D9;
 }
 
-/* Custom scrollbar */
+/* ── Custom scrollbar ── */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #D4D3CE;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #A19F99;
 }
 
-/* Number input spinner removal for cleaner look */
+/* ── Number input spinner removal ── */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -54,4 +153,30 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* ── Animations ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.5; }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s ease-in-out infinite;
 }

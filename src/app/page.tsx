@@ -1,9 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Trash2, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback, type FormEvent } from 'react';
+import {
+  Upload,
+  Loader2,
+  LayoutGrid,
+  X,
+  Zap,
+  Minus,
+  Plus,
+} from 'lucide-react';
 import { ShareAuditButton } from '@/components/ShareAuditButton';
 import { runAudit, type AuditFinding, type AuditResult } from '@/lib/audit-engine';
+
+/* ─────────────────────────────────────────────
+ *  TYPES & CONSTANTS
+ * ───────────────────────────────────────────── */
 
 interface ToolEntry {
   id: string;
@@ -13,47 +25,15 @@ interface ToolEntry {
   seats: number;
 }
 
-const TOOLS = {
-  cursor: {
-    name: 'Cursor',
-    plans: ['Hobby', 'Pro', 'Business', 'Enterprise'],
-    hasSeats: true,
-  },
-  copilot: {
-    name: 'GitHub Copilot',
-    plans: ['Individual', 'Business', 'Enterprise'],
-    hasSeats: true,
-  },
-  claude: {
-    name: 'Claude',
-    plans: ['Free', 'Pro', 'Max', 'Team', 'Enterprise', 'API direct'],
-    hasSeats: true,
-  },
-  chatgpt: {
-    name: 'ChatGPT',
-    plans: ['Plus', 'Team', 'Enterprise', 'API direct'],
-    hasSeats: true,
-  },
-  anthropic_api: {
-    name: 'Anthropic API',
-    plans: ['Pay-as-you-go'],
-    hasSeats: false,
-  },
-  openai_api: {
-    name: 'OpenAI API',
-    plans: ['Pay-as-you-go'],
-    hasSeats: false,
-  },
-  gemini: {
-    name: 'Gemini',
-    plans: ['Pro', 'Ultra', 'API'],
-    hasSeats: true,
-  },
-  windsurf: {
-    name: 'Windsurf',
-    plans: ['Free', 'Pro', 'Teams', 'Enterprise'],
-    hasSeats: true,
-  },
+const TOOLS: Record<string, { name: string; plans: string[]; hasSeats: boolean; category: string }> = {
+  cursor: { name: 'Cursor', plans: ['Hobby', 'Pro', 'Business', 'Enterprise'], hasSeats: true, category: 'Code Editor' },
+  copilot: { name: 'GitHub Copilot', plans: ['Individual', 'Business', 'Enterprise'], hasSeats: true, category: 'Code Assistant' },
+  claude: { name: 'Claude', plans: ['Free', 'Pro', 'Max', 'Team', 'Enterprise', 'API direct'], hasSeats: true, category: 'AI Chat' },
+  chatgpt: { name: 'ChatGPT', plans: ['Plus', 'Team', 'Enterprise', 'API direct'], hasSeats: true, category: 'AI Chat' },
+  anthropic_api: { name: 'Anthropic API', plans: ['Pay-as-you-go'], hasSeats: false, category: 'API' },
+  openai_api: { name: 'OpenAI API', plans: ['Pay-as-you-go'], hasSeats: false, category: 'API' },
+  gemini: { name: 'Gemini', plans: ['Pro', 'Ultra', 'API'], hasSeats: true, category: 'AI Chat' },
+  windsurf: { name: 'Windsurf', plans: ['Free', 'Pro', 'Teams', 'Enterprise'], hasSeats: true, category: 'Code Editor' },
 };
 
 const USE_CASES = ['coding', 'writing', 'data', 'research', 'mixed'];
@@ -69,6 +49,28 @@ const TOOL_LINKS: Record<string, string> = {
   'Windsurf': 'https://windsurf.com/pricing',
 };
 
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 9);
+}
+
+function getToolName(toolKey: string): string {
+  return TOOLS[toolKey]?.name || toolKey;
+}
+
+function formatToolsList(tools: ToolEntry[]): string {
+  return tools.map((entry) => `${getToolName(entry.tool)} ${entry.plan}`).join(', ');
+}
+
+function getSeverityLabel(finding: AuditFinding): 'HIGH' | 'MEDIUM' | 'LOW' {
+  if (finding.severity === 'high') return 'HIGH';
+  if (finding.severity === 'medium') return 'MEDIUM';
+  return 'LOW';
+}
+
+/* ─────────────────────────────────────────────
+ *  APPLY FIX BUTTON
+ * ───────────────────────────────────────────── */
+
 function ApplyFixButton({ toolName }: { toolName: string }) {
   const [opening, setOpening] = useState(false);
 
@@ -83,41 +85,56 @@ function ApplyFixButton({ toolName }: { toolName: string }) {
     <button
       type="button"
       onClick={handleClick}
-      className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-400 transition-colors hover:bg-cyan-500/20"
+      className="text-[10px] text-[#6D28D9] bg-[#EDE9FE] border border-[#C4B5FD] rounded px-2 py-1 transition-colors hover:bg-[#DDD6FE]"
     >
-      {opening ? 'Opening...' : 'Apply Fix'}
+      {opening ? 'Opening...' : 'Apply Fix ↗'}
     </button>
   );
 }
 
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 9);
+/* ─────────────────────────────────────────────
+ *  COUNT-UP HOOK
+ * ───────────────────────────────────────────── */
+
+function useCountUp(target: number, duration: number = 600): number {
+  const [value, setValue] = useState(0);
+  const prevTarget = useRef(0);
+
+  useEffect(() => {
+    if (target === prevTarget.current) return;
+    const start = prevTarget.current;
+    prevTarget.current = target;
+    const startTime = performance.now();
+
+    function tick(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(start + (target - start) * eased));
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+
+    requestAnimationFrame(tick);
+  }, [target, duration]);
+
+  return value;
 }
 
-function getToolName(toolKey: string): string {
-  return TOOLS[toolKey as keyof typeof TOOLS]?.name || toolKey;
-}
-
-function formatToolsList(tools: ToolEntry[]): string {
-  return tools
-    .map((entry) => `${getToolName(entry.tool)} ${entry.plan}`)
-    .join(', ');
-}
-
-function getSeverityLabel(finding: AuditFinding): 'HIGH' | 'MEDIUM' | 'LOW' {
-  if (finding.severity === 'high') return 'HIGH';
-  if (finding.severity === 'medium') return 'MEDIUM';
-  return 'LOW';
-}
+/* ═══════════════════════════════════════════════
+ *  MAIN PAGE COMPONENT
+ * ═══════════════════════════════════════════════ */
 
 export default function Home() {
+  /* ── State ── */
   const [entries, setEntries] = useState<ToolEntry[]>([]);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [useCase, setUseCase] = useState<string>('coding');
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
-  const [showResults, setShowResults] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Email capture / share state
   const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('');
@@ -126,14 +143,13 @@ export default function Home() {
   const [shareId, setShareId] = useState('');
   const [savingAudit, setSavingAudit] = useState(false);
   const [captureError, setCaptureError] = useState('');
-  const emailCaptureRef = useRef<HTMLDivElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
 
+  /* ── Persistence ── */
   useEffect(() => {
     const saved = localStorage.getItem('creditlens_form');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntries(parsed.entries || []);
       setTeamSize(parsed.teamSize || 1);
       setUseCase(parsed.useCase || 'coding');
@@ -144,6 +160,7 @@ export default function Home() {
     localStorage.setItem('creditlens_form', JSON.stringify({ entries, teamSize, useCase }));
   }, [entries, teamSize, useCase]);
 
+  /* ── Entry CRUD ── */
   function addEntry() {
     const newEntry: ToolEntry = {
       id: generateId(),
@@ -156,24 +173,69 @@ export default function Home() {
   }
 
   function updateEntry(id: string, field: keyof ToolEntry, value: string | number) {
-    setEntries(entries.map((entry) =>
-      entry.id === id ? { ...entry, [field]: value } : entry
-    ));
+    setEntries((prev) =>
+      prev.map((entry) => (entry.id === id ? { ...entry, [field]: value } : entry))
+    );
   }
 
   function removeEntry(id: string) {
     setEntries(entries.filter((entry) => entry.id !== id));
   }
 
+  /* ── CSV Import ── */
+  const handleCSVImport = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        const lines = text.trim().split('\n').slice(1);
+        const parsed: ToolEntry[] = lines
+          .map((line) => {
+            const [tool, plan, spend, seats] = line.split(',').map((s) => s.trim().replace(/"/g, ''));
+            return {
+              id: generateId(),
+              tool: tool.toLowerCase(),
+              plan: plan || 'Pro',
+              monthlySpend: parseFloat(spend) || 0,
+              seats: parseInt(seats) || 1,
+            };
+          })
+          .filter((e) => TOOLS[e.tool as keyof typeof TOOLS]);
+        if (parsed.length > 0) setEntries((prev) => [...prev, ...parsed]);
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, []);
+
+  /* ── Run Audit ── */
   async function runAuditAndSummarize() {
     if (entries.length === 0) return;
 
+    setIsRunning(true);
     const result = runAudit(entries, teamSize, useCase);
     setAuditResult(result);
-    setShowResults(true);
     setEmailCaptured(false);
     setShareId('');
     setCaptureError('');
+
+    // Save to audit history in localStorage
+    try {
+      const history = JSON.parse(localStorage.getItem('creditlens_audit_history') || '[]');
+      history.unshift({
+        id: generateId(),
+        date: new Date().toISOString(),
+        toolCount: entries.length,
+        totalSpend: result.totalMonthlySpend,
+        totalSavings: result.totalMonthlySavings,
+      });
+      localStorage.setItem('creditlens_audit_history', JSON.stringify(history.slice(0, 20)));
+    } catch {}
 
     setAiLoading(true);
     try {
@@ -201,9 +263,11 @@ export default function Home() {
       setAiSummary(result.summary);
     } finally {
       setAiLoading(false);
+      setIsRunning(false);
     }
   }
 
+  /* ── Email Submit ── */
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!auditResult) return;
@@ -237,6 +301,13 @@ export default function Home() {
 
       setShareId(saveData.shareId);
       setEmailCaptured(true);
+
+      // Update the most recent history entry with the shareId
+      try {
+        const history = JSON.parse(localStorage.getItem('creditlens_audit_history') || '[]');
+        if (history[0]) { history[0].shareId = saveData.shareId; }
+        localStorage.setItem('creditlens_audit_history', JSON.stringify(history));
+      } catch {}
     } catch (error) {
       console.error('Lead capture failed:', error);
       setCaptureError(
@@ -247,456 +318,456 @@ export default function Home() {
     }
   }
 
-  function focusEmailCapture() {
-    emailCaptureRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    emailInputRef.current?.focus();
-  }
-
+  /* ── Derived values ── */
   const totalSpend = entries.reduce((sum, entry) => sum + (entry.monthlySpend || 0), 0);
   const totalSavings = Math.round(auditResult?.totalMonthlySavings || 0);
   const totalAnnualSavings = totalSavings * 12;
   const findings = auditResult?.findings || [];
   const summary = aiSummary || auditResult?.summary || '';
+  const savingsPercent = totalSpend > 0 ? Math.round((totalSavings / totalSpend) * 100) : 0;
   const shareUrl = shareId ? `https://creditlens-navy.vercel.app/audit/${shareId}` : '';
-  const visibleShareUrl = shareId
-    ? `creditlens-navy.vercel.app/audit/${shareId}`
-    : 'Save your report to generate a shareable link';
 
-  /* ─────────────────────────────────────────────
-   *  FORM VIEW  (Mockup 1 — white content card)
-   * ───────────────────────────────────────────── */
-  if (!showResults) {
-    return (
-      <div className="flex-1 bg-white">
-        <div className="mx-auto max-w-3xl px-4 py-12 md:py-16">
-          {/* Hero heading */}
-          <div className="mb-10 text-center">
-            <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-4xl">
-              Audit your AI tool spend
-            </h1>
-            <p className="text-gray-400">
-              Find savings instantly. Free for any team.
-            </p>
-          </div>
+  const animatedSavings = useCountUp(totalSavings);
 
-          {/* ── Team Information ── */}
-          <div className="border-t border-gray-200 pt-8 pb-8">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
-                  Team Size
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="e.g. 5"
-                  value={teamSize === 0 ? '' : teamSize}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/[^0-9]/g, '');
-                    setTeamSize(raw === '' ? 0 : parseInt(raw));
-                  }}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none transition-colors"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
-                  Primary Use Case
-                </label>
-                <select
-                  value={useCase}
-                  onChange={(e) => setUseCase(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none transition-colors"
-                >
-                  {USE_CASES.map((uc) => (
-                    <option key={uc} value={uc}>
-                      {uc.charAt(0).toUpperCase() + uc.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+  /* ═══════════════════════════════════════════════
+   *  RENDER
+   * ═══════════════════════════════════════════════ */
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── TOP BAR ── */}
+      <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#E5E4DF] bg-white shrink-0">
+        <div>
+          <h1 className="text-[13px] font-semibold text-[#111110]">New Audit</h1>
+          <p className="text-[11px] text-[#A19F99] mt-0.5">Add your AI tools to analyze spend</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={handleCSVImport} className="cl-btn-ghost">
+            <Upload size={12} /> Import CSV
+          </button>
+          <button
+            type="button"
+            onClick={runAuditAndSummarize}
+            disabled={entries.length === 0 || isRunning}
+            className="cl-btn-primary inline-flex items-center gap-2 text-[12px]"
+          >
+            {isRunning && <Loader2 size={13} className="animate-spin" />}
+            Run Audit
+          </button>
+        </div>
+      </div>
 
-          {/* ── AI Tools Section ── */}
-          <div className="border-t border-gray-200 pt-6">
-            {/* Add Tool button */}
-            <div className="mb-5 flex justify-end">
-              <button
-                type="button"
-                onClick={addEntry}
-                className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500 transition-colors hover:text-cyan-600"
-              >
-                <span className="text-base leading-none">+</span> Add Tool
-              </button>
-            </div>
-
-            {/* Column headers + rows */}
-            {entries.length > 0 && (
-              <>
-                <div className="mb-1 hidden border-b border-gray-200 pb-2 md:grid md:grid-cols-[2fr_2fr_1.5fr_1fr_36px] md:gap-4">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Tool</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Plan</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Spend</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">Seats</span>
-                  <span />
+      {/* ── MAIN CONTENT — two columns ── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="grid grid-cols-[1fr_300px] gap-5 p-6 min-h-full">
+          {/* ════════════════════════════════
+           *  LEFT PANEL
+           * ════════════════════════════════ */}
+          <div className="space-y-4">
+            {/* ── Team config row ── */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Team Size tile */}
+              <div className="cl-card p-4">
+                <p className="cl-label mb-3">Team Size</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[22px] font-semibold text-[#111110]">
+                    {teamSize}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setTeamSize(Math.max(1, teamSize - 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E5E4DF] bg-[#F4F4F1] text-[#605F5B] hover:bg-[#E5E4DF] transition-colors"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeamSize(teamSize + 1)}
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E5E4DF] bg-[#F4F4F1] text-[#605F5B] hover:bg-[#E5E4DF] transition-colors"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                 </div>
+              </div>
 
-                {entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="grid grid-cols-1 gap-3 border-b border-gray-100 py-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_36px] md:items-center md:gap-4"
-                  >
-                    {/* Tool select */}
-                    <div>
-                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Tool</span>
-                      <select
-                        value={entry.tool}
-                        onChange={(e) => updateEntry(entry.id, 'tool', e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
-                      >
-                        {Object.entries(TOOLS).map(([key, tool]) => (
-                          <option key={key} value={key}>{tool.name}</option>
-                        ))}
-                      </select>
-                    </div>
+              {/* Use Case tile */}
+              <div className="cl-card p-4">
+                <p className="cl-label mb-3">Primary Use Case</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {USE_CASES.map((uc) => (
+                    <button
+                      key={uc}
+                      type="button"
+                      onClick={() => setUseCase(uc)}
+                      className={`rounded px-2.5 py-[3px] text-[10px] border transition-colors ${
+                        useCase === uc
+                          ? 'bg-[#6D28D9] text-white border-[#6D28D9]'
+                          : 'bg-[#F4F4F1] text-[#605F5B] border-[#E5E4DF] hover:border-[#D4D3CE]'
+                      }`}
+                    >
+                      {uc.charAt(0).toUpperCase() + uc.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-                    {/* Plan select */}
-                    <div>
-                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Plan</span>
+            {/* ── Tools table section ── */}
+            <div className="cl-card p-4">
+              {/* Section header */}
+              <div className="flex items-center justify-between mb-3">
+                <p className="cl-label">AI Tools Stack</p>
+                <button
+                  type="button"
+                  onClick={addEntry}
+                  className="text-[10px] uppercase tracking-wider text-[#6D28D9] font-medium hover:text-[#5B21B6] transition-colors"
+                >
+                  + Add Tool
+                </button>
+              </div>
+
+              {entries.length > 0 ? (
+                <>
+                  {/* Column headers */}
+                  <div className="grid grid-cols-[1fr_100px_90px_56px_28px] gap-3 mb-1 pb-2 border-b border-[#F0EFEA]">
+                    <span className="cl-label">Tool</span>
+                    <span className="cl-label">Plan</span>
+                    <span className="cl-label">$/mo</span>
+                    <span className="cl-label">Seats</span>
+                    <span />
+                  </div>
+
+                  {/* Tool rows */}
+                  {entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="grid grid-cols-[1fr_100px_90px_56px_28px] gap-3 py-2.5 border-b border-[#F0EFEA] items-center hover:bg-[#FAFAF8] transition-colors"
+                    >
+                      {/* Tool cell */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#F4F4F1] border border-[#E5E4DF] text-[11px] font-medium text-[#605F5B]">
+                          {getToolName(entry.tool).charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <select
+                            value={entry.tool}
+                            onChange={(e) => {
+                              updateEntry(entry.id, 'tool', e.target.value);
+                              const newTool = TOOLS[e.target.value as keyof typeof TOOLS];
+                              if (newTool) updateEntry(entry.id, 'plan', newTool.plans[0]);
+                            }}
+                            className="bg-transparent text-[13px] text-[#111110] font-medium border-none outline-none cursor-pointer appearance-none w-full"
+                          >
+                            {Object.entries(TOOLS).map(([key, tool]) => (
+                              <option key={key} value={key}>
+                                {tool.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[10px] text-[#A19F99] -mt-0.5">
+                            {TOOLS[entry.tool as keyof typeof TOOLS]?.category || ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Plan cell */}
                       <select
                         value={entry.plan}
                         onChange={(e) => updateEntry(entry.id, 'plan', e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
+                        className="cl-input text-[12px] !py-[5px] appearance-none cursor-pointer"
                       >
-                        {TOOLS[entry.tool as keyof typeof TOOLS].plans.map((plan) => (
-                          <option key={plan} value={plan}>{plan}</option>
+                        {TOOLS[entry.tool as keyof typeof TOOLS]?.plans.map((plan) => (
+                          <option key={plan} value={plan}>
+                            {plan}
+                          </option>
                         ))}
                       </select>
-                    </div>
 
-                    {/* Spend input */}
-                    <div>
-                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Spend</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={entry.monthlySpend === 0 ? '' : entry.monthlySpend}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/[^0-9.]/g, '');
-                          updateEntry(entry.id, 'monthlySpend', raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0));
-                        }}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:outline-none"
-                        placeholder="$0"
-                      />
-                    </div>
-
-                    {/* Seats */}
-                    <div>
-                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400 md:hidden">Seats</span>
-                      <div className="flex items-center gap-1.5">
+                      {/* Spend cell */}
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#A19F99] text-[12px]">$</span>
                         <input
                           type="text"
-                          inputMode="numeric"
-                          value={entry.seats === 0 ? '' : entry.seats}
+                          inputMode="decimal"
+                          value={entry.monthlySpend === 0 ? '' : entry.monthlySpend}
                           onChange={(e) => {
-                            const raw = e.target.value.replace(/[^0-9]/g, '');
-                            updateEntry(entry.id, 'seats', raw === '' ? 0 : parseInt(raw));
+                            const raw = e.target.value.replace(/[^0-9.]/g, '');
+                            updateEntry(entry.id, 'monthlySpend', raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0));
                           }}
-                          className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-2 text-center text-sm text-gray-900 focus:border-cyan-500 focus:outline-none"
+                          placeholder="0"
+                          className="cl-input text-[12px] !py-[5px] font-mono text-right !pl-5"
                         />
-                        <span className="text-xs text-gray-400">seats</span>
                       </div>
-                    </div>
 
-                    {/* Delete */}
-                    <div className="flex justify-end">
+                      {/* Seats cell */}
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={entry.seats === 0 ? '' : entry.seats}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          updateEntry(entry.id, 'seats', raw === '' ? 0 : parseInt(raw));
+                        }}
+                        className="cl-input text-[12px] !py-[5px] font-mono text-center"
+                      />
+
+                      {/* Delete cell */}
                       <button
                         type="button"
                         onClick={() => removeEntry(entry.id)}
-                        className="rounded p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
+                        className="flex items-center justify-center text-[#C8C6C0] hover:text-[#DC2626] transition-colors"
                         aria-label="Remove tool"
                       >
-                        <Trash2 size={15} />
+                        <X size={13} />
                       </button>
                     </div>
+                  ))}
+
+                  {/* Total row */}
+                  <div className="flex items-center justify-between border-t border-[#E5E4DF] pt-3 mt-1">
+                    <span className="cl-label">Total Monthly Spend</span>
+                    <span className="font-mono text-[18px] font-semibold text-[#6D28D9]">
+                      ${totalSpend.toLocaleString()}
+                    </span>
                   </div>
-                ))}
-              </>
-            )}
 
-            {entries.length === 0 && (
-              <div className="py-14 text-center">
-                <p className="text-gray-400">Add the AI tools your team pays for.</p>
-                <p className="mt-1 text-sm text-gray-300">We&apos;ll find where you&apos;re overspending.</p>
-              </div>
-            )}
-
-            {/* Total spend */}
-            {entries.length > 0 && (
-              <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-5">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
-                  Total Monthly Spend
-                </span>
-                <span className="text-xl font-bold text-cyan-500">
-                  ${totalSpend.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Run Audit button */}
-          <div className="mt-10">
-            <button
-              type="button"
-              disabled={entries.length === 0}
-              onClick={runAuditAndSummarize}
-              className="w-full rounded-xl border-2 border-dashed py-4 text-lg font-semibold transition-all
-                disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-300
-                enabled:border-cyan-500/60 enabled:text-cyan-600 enabled:hover:border-cyan-500 enabled:hover:bg-cyan-50"
-            >
-              {entries.length === 0 ? 'Add at least one tool to run audit' : 'Run Audit →'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ─────────────────────────────────────────────
-   *  RESULTS VIEW  (Mockup 2 — dark theme)
-   * ───────────────────────────────────────────── */
-  return (
-    <div className="flex-1 pb-20">
-      <div className="mx-auto max-w-6xl px-4 pt-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
-          {/* ── Left column ── */}
-          <div className="space-y-5">
-            {/* Green savings banner */}
-            <div className="rounded-xl bg-gradient-to-br from-green-500 to-green-600 p-8 text-center shadow-lg shadow-green-900/30">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-green-950">
-                Potential Monthly Savings
-              </p>
-              <p className="mb-2 text-5xl font-black text-white lg:text-7xl">
-                ${totalSavings.toLocaleString()}
-              </p>
-              <p className="font-medium text-green-900">
-                ${totalAnnualSavings.toLocaleString()} / year
-              </p>
-            </div>
-
-            {/* Amber CTA */}
-            {totalSavings > 500 && (
-              <div className="flex flex-col gap-4 rounded-xl bg-amber-500 p-5 md:flex-row md:items-center md:justify-between">
-                <p className="font-medium text-amber-950">
-                  Your team could save ${totalSavings.toLocaleString()}/mo — Credex offers discounted AI credits...
-                </p>
-                <a
-                  href={`mailto:hello@credex.rocks?subject=${encodeURIComponent(`CreditLens Audit — $${totalSavings}/mo savings opportunity`)}`}
-                  className="shrink-0 whitespace-nowrap rounded-lg bg-amber-950 px-4 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-900"
-                >
-                  Book a Credex Consultation →
-                </a>
-              </div>
-            )}
-
-            {/* AI Summary */}
-            <div className="card-accent rounded-xl border border-[#334155] bg-[#1e293b] p-6">
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-cyan-300">
-                <Sparkles size={16} className="text-cyan-400" />
-                AI Summary
-              </h3>
-              {aiLoading ? (
-                <div className="animate-pulse space-y-2">
-                  <div className="h-4 w-full rounded bg-slate-700" />
-                  <div className="h-4 w-5/6 rounded bg-slate-700" />
-                  <div className="h-4 w-4/6 rounded bg-slate-700" />
-                </div>
+                  {/* Run Audit button */}
+                  <button
+                    type="button"
+                    onClick={runAuditAndSummarize}
+                    disabled={entries.length === 0 || isRunning}
+                    className="cl-btn-primary w-full mt-3 py-3 text-[13px] inline-flex items-center justify-center gap-2"
+                  >
+                    {isRunning && <Loader2 size={14} className="animate-spin" />}
+                    {entries.length === 0 ? 'Add at least one tool' : 'Run Audit'}
+                  </button>
+                </>
               ) : (
-                <p className="text-sm leading-relaxed text-slate-300">{summary}</p>
+                /* ── Empty state ── */
+                <div className="border border-dashed border-[#E5E4DF] rounded-lg py-10 text-center">
+                  <LayoutGrid size={20} className="mx-auto text-[#D4D3CE] mb-3" />
+                  <p className="text-[#A19F99] text-[13px]">Add the AI tools your team pays for</p>
+                  <button
+                    type="button"
+                    onClick={addEntry}
+                    className="mt-3 text-[11px] font-medium text-[#6D28D9] hover:text-[#5B21B6] transition-colors"
+                  >
+                    + Add Tool
+                  </button>
+                </div>
               )}
             </div>
+          </div>
 
-            <div className="border-t border-[#334155]" />
+          {/* ════════════════════════════════
+           *  RIGHT PANEL
+           * ════════════════════════════════ */}
+          <div className="sticky top-0 self-start space-y-3 overflow-y-auto max-h-[calc(100vh-120px)]">
+            {!auditResult ? (
+              /* ── Empty state ── */
+              <div className="cl-card p-6 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#EDE9FE]">
+                  <Zap size={18} className="text-[#6D28D9]" />
+                </div>
+                <p className="text-[#605F5B] text-[13px] mb-1">Add your tools and run an audit</p>
+                <p className="text-[#A19F99] text-[11px] mb-5">Savings opportunities will appear here</p>
+                {/* Shimmer placeholders */}
+                <div className="space-y-2">
+                  <div className="h-[60px] rounded-lg bg-[#F4F4F1] animate-shimmer" />
+                  <div className="h-[48px] rounded-lg bg-[#F4F4F1] animate-shimmer" style={{ animationDelay: '0.2s' }} />
+                  <div className="h-[48px] rounded-lg bg-[#F4F4F1] animate-shimmer" style={{ animationDelay: '0.4s' }} />
+                </div>
+              </div>
+            ) : (
+              /* ── Results ── */
+              <>
+                {/* [1] Savings Hero Card */}
+                <div
+                  className="cl-card p-5 text-center border-t-2 border-t-[#6D28D9] animate-fade-in-up"
+                >
+                  <p className="cl-label text-center">
+                    Potential Savings
+                  </p>
+                  <p className="font-mono text-[40px] font-semibold text-[#111110] tracking-tight leading-none mt-1">
+                    ${animatedSavings.toLocaleString()}
+                  </p>
+                  <p className="text-[11px] text-[#A19F99] mt-1">
+                    ${totalAnnualSavings.toLocaleString()} per year
+                  </p>
 
-            {/* Recommendations */}
-            {findings.length > 0 ? (
-              <div className="space-y-3">
-                {findings.map((finding) => {
-                  const priority = getSeverityLabel(finding);
+                  {/* Progress bar */}
+                  <div className="h-[3px] bg-[#F4F4F1] rounded my-3 overflow-hidden">
+                    <div
+                      className="h-full rounded bg-[#6D28D9] transition-all duration-700"
+                      style={{ width: `${Math.min(savingsPercent, 100)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between text-[10px] text-[#A19F99]">
+                    <span>{savingsPercent}% of spend</span>
+                    <span>{findings.length} finding{findings.length !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+
+                {/* [2] AI Analysis Card */}
+                <div className="cl-card p-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#6D28D9]" />
+                    <span className="text-[#605F5B] text-[11px] font-medium">AI Analysis</span>
+                  </div>
+                  {aiLoading ? (
+                    <div className="space-y-2">
+                      <div className="h-2.5 w-full rounded bg-[#F4F4F1] animate-pulse" />
+                      <div className="h-2.5 w-5/6 rounded bg-[#F4F4F1] animate-pulse" />
+                      <div className="h-2.5 w-4/6 rounded bg-[#F4F4F1] animate-pulse" />
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-[#605F5B] leading-relaxed">{summary}</p>
+                  )}
+                </div>
+
+                {/* [3] Findings */}
+                {findings.map((finding, idx) => {
+                  const severity = getSeverityLabel(finding);
+                  const accentColor =
+                    severity === 'HIGH'
+                      ? 'border-l-[#DC2626]'
+                      : severity === 'MEDIUM'
+                        ? 'border-l-[#D97706]'
+                        : 'border-l-[#059669]';
+                  const badgeClasses =
+                    severity === 'HIGH'
+                      ? 'bg-[#FEE2E2] text-[#DC2626]'
+                      : severity === 'MEDIUM'
+                        ? 'bg-[#FEF3C7] text-[#D97706]'
+                        : 'bg-[#D1FAE5] text-[#059669]';
 
                   return (
                     <div
                       key={`${finding.tool}-${finding.currentPlan}-${finding.recommendedPlan}`}
-                      className="card-accent rounded-xl border border-[#334155] bg-[#1e293b] p-5"
+                      className={`cl-card overflow-hidden border-l-2 ${accentColor} animate-fade-in-up`}
+                      style={{ animationDelay: `${0.15 + idx * 0.05}s` }}
                     >
-                      <div className="mb-2 flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-white">{finding.tool}</span>
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                            priority === 'HIGH'
-                              ? 'bg-red-500/20 text-red-400'
-                              : priority === 'MEDIUM'
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-green-500/20 text-green-400'
-                          }`}
+                      {/* Top row */}
+                      <div className="flex items-center justify-between px-3 pt-2.5 pb-2 bg-[#FAFAF8]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#111110] text-[12px] font-medium">{finding.tool}</span>
+                          <span
+                            className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-[3px] ${badgeClasses}`}
                           >
-                            {priority}
+                            {severity}
                           </span>
                         </div>
-                        <span className="shrink-0 font-bold text-green-400">
+                        <span className="text-[#059669] font-mono text-[11px]">
                           Save ${Math.round(finding.savings)}/mo
                         </span>
                       </div>
-                      <p className="mb-3 text-sm text-slate-400">{finding.reason}</p>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-mono text-xs text-slate-500">
-                          {finding.currentPlan} → <span className="font-semibold text-white">{finding.recommendedPlan}</span>
-                        </span>
-                        <ApplyFixButton toolName={finding.tool} />
+
+                      {/* Body */}
+                      <div className="px-3 pb-3">
+                        <p className="text-[11px] text-[#605F5B] leading-relaxed mt-1 mb-2">
+                          {finding.reason}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-[#A19F99]">
+                            <span className="opacity-60">{finding.currentPlan}</span>
+                            {' → '}
+                            <span className="text-[#111110]">{finding.recommendedPlan}</span>
+                          </span>
+                          <ApplyFixButton toolName={finding.tool} />
+                        </div>
                       </div>
                     </div>
                   );
                 })}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5 text-center">
-                <p className="font-semibold text-green-400">You&apos;re all set!</p>
-                <p className="mt-2 text-sm text-slate-400">{auditResult?.summary}</p>
-              </div>
-            )}
 
-            {totalSavings < 100 && (
-              <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5 text-center">
-                <p className="mb-4 text-sm text-slate-300">
-                  You&apos;re spending efficiently. We&apos;ll notify you when better options appear for your stack.
-                </p>
-                <button
-                  type="button"
-                  onClick={focusEmailCapture}
-                  className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20"
-                >
-                  Notify me
-                </button>
-              </div>
-            )}
-
-            <p className="pt-4 text-center text-xs text-slate-600">
-              Audited by CreditLens · creditlens-navy.vercel.app
-            </p>
-          </div>
-
-          {/* ── Right sidebar ── */}
-          <div className="space-y-4">
-            {/* Share card */}
-            <div className="rounded-xl border border-[#334155] bg-[#1e293b] p-5">
-              <h3 className="mb-3 font-semibold text-white">Share your audit</h3>
-              <div className="mb-3 flex gap-2">
-                <div className="flex-1 truncate rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-sm text-slate-400">
-                  {visibleShareUrl}
-                </div>
-                {shareUrl ? (
-                  <ShareAuditButton
-                    url={shareUrl}
-                    idleLabel="⎘ Copy"
-                    className="whitespace-nowrap rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/20"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="whitespace-nowrap rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-500"
-                  >
-                    ⎘ Copy
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowResults(false)}
-                className="w-full rounded-lg border border-[#334155] py-2 text-center text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-300"
-              >
-                ← Start New Audit
-              </button>
-            </div>
-
-            {/* Save report card */}
-            <div
-              ref={emailCaptureRef}
-              className="rounded-xl border border-[#334155] bg-[#1e293b] p-5"
-            >
-              <h3 className="mb-1 font-semibold text-white">Save your report</h3>
-              <p className="mb-4 text-sm text-slate-400">
-                Get the shareable link by email.
-              </p>
-
-              <form onSubmit={handleEmailSubmit} className="space-y-3">
-                {/* Honeypot */}
-                <input
-                  type="text"
-                  name="b_address"
-                  value={b_address}
-                  onChange={(e) => setB_address(e.target.value)}
-                  style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}
-                  tabIndex={-1}
-                  autoComplete="off"
-                  aria-hidden="true"
-                />
-
-                <input
-                  ref={emailInputRef}
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email"
-                  required
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
-                />
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Company"
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
-                />
-                <input
-                  type="text"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  placeholder="Role"
-                  className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
-                />
-
-                {captureError && (
-                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                    <p className="text-xs text-red-300">{captureError}</p>
-                    <button
-                      type="submit"
-                      disabled={savingAudit}
-                      className="mt-2 text-xs font-semibold text-red-200 underline underline-offset-4 disabled:opacity-50"
-                    >
-                      Try again
-                    </button>
+                {findings.length === 0 && (
+                  <div className="cl-card p-4 text-center animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+                    <p className="text-[12px] text-[#059669] font-medium">You&apos;re all set!</p>
+                    <p className="text-[11px] text-[#A19F99] mt-1">{auditResult?.summary}</p>
                   </div>
                 )}
 
-                {emailCaptured && (
-                  <p className="text-xs text-green-400">
-                    ✓ Report sent to your email!
-                  </p>
-                )}
+                {/* [4] Save & Share Card */}
+                <div className="cl-card p-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+                  <p className="cl-label mb-2">Save & Share</p>
 
-                <button
-                  type="submit"
-                  disabled={savingAudit}
-                  className="w-full rounded-lg bg-cyan-500 py-2.5 font-semibold text-white transition-colors hover:bg-cyan-400 disabled:opacity-50"
-                >
-                  {savingAudit ? 'Saving...' : captureError ? 'Retry Save' : 'Get My Report'}
-                </button>
-                <p className="text-center text-xs text-slate-500">
-                  No spam. We&apos;ll reach out only for high-savings cases.
-                </p>
-              </form>
-            </div>
+                  {shareUrl && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex-1 truncate rounded-md bg-[#FAFAF8] border border-[#E5E4DF] px-2.5 py-1.5 text-[11px] text-[#A19F99] font-mono">
+                        {shareUrl.replace('https://', '')}
+                      </div>
+                      <ShareAuditButton
+                        url={shareUrl}
+                        idleLabel="Copy"
+                        copiedLabel="✓"
+                        className="text-[10px] text-[#6D28D9] bg-[#EDE9FE] border border-[#C4B5FD] rounded px-2 py-1.5 transition-colors hover:bg-[#DDD6FE]"
+                      />
+                    </div>
+                  )}
+
+                  <form onSubmit={handleEmailSubmit} className="space-y-2">
+                    {/* Honeypot */}
+                    <input
+                      type="text"
+                      name="b_address"
+                      value={b_address}
+                      onChange={(e) => setB_address(e.target.value)}
+                      style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                    />
+
+                    <input
+                      ref={emailInputRef}
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email"
+                      required
+                      className="cl-input text-[12px]"
+                    />
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Company"
+                      className="cl-input text-[12px]"
+                    />
+                    <input
+                      type="text"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      placeholder="Role"
+                      className="cl-input text-[12px]"
+                    />
+
+                    {captureError && (
+                      <div className="rounded-md border border-[#DC2626]/30 bg-[#FEE2E2] p-2">
+                        <p className="text-[10px] text-[#DC2626]">{captureError}</p>
+                      </div>
+                    )}
+
+                    {emailCaptured && (
+                      <p className="text-[10px] text-[#059669]">✓ Report sent to your email!</p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={savingAudit}
+                      className="cl-btn-primary w-full !text-[11px] !py-2"
+                    >
+                      {savingAudit ? 'Saving...' : captureError ? 'Retry Save' : 'Get My Report'}
+                    </button>
+                    <p className="text-center text-[9px] text-[#C8C6C0]">
+                      No spam. We&apos;ll reach out only for high-savings cases.
+                    </p>
+                  </form>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
