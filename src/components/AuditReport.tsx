@@ -17,6 +17,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 import type { AuditResult, AggregatedVendor, Finding } from '../engine/types';
+import { buildPricingMap } from '../data/pricing';
+
 
 interface AuditReportProps {
   auditResult: AuditResult;
@@ -37,6 +39,8 @@ export function AuditReport({
 }: AuditReportProps) {
   // Expandable evidence cards state
   const [expandedEvidence, setExpandedEvidence] = useState<Record<string, boolean>>({});
+  const pricingMap = React.useMemo(() => buildPricingMap(), []);
+
 
   // LLM prose phrasing state
   const [llmProse, setLlmProse] = useState<string>('');
@@ -390,16 +394,18 @@ export function AuditReport({
         </div>
       </div>
 
-      {/* ── Phase 5: Per-Vendor Forecast Callouts & Renewal Dates ── */}
+      {/* ── Per-Vendor Report Cards (Expected vs. Actual & Forecasts) ── */}
       <div className="cl-card p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-[#E5E4DF] pb-3">
           <div>
-            <h3 className="text-sm font-bold text-[#111110]">Vendor Forecasts & Renewal Watchdog</h3>
-            <p className="text-xs text-[#605F5B]">Set renewal dates below to receive automatic utilization alerts 14 days prior.</p>
+            <h3 className="text-sm font-bold text-[#111110]">Per-Vendor Report Cards: Expected vs. Actual Spend</h3>
+            <p className="text-xs text-[#605F5B]">
+              Deterministic market benchmark comparison, 3-month utilization forecast, and renewal watchdog.
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {aggregatedVendors.map((vendor) => {
             const forecast = auditResult.vendorForecasts.find((vf) => vf.vendorId === vendor.vendorId);
             const predictedMonths = forecast ? Object.keys(forecast.predictedAmounts).sort() : [];
@@ -407,34 +413,85 @@ export function AuditReport({
             const targetAmount = targetMonth ? forecast?.predictedAmounts[targetMonth] : 0;
             const currentSpend = vendor.monthlyAmounts[latestMonth] || 0;
 
+            const pricing = pricingMap.get(vendor.vendorId);
+            const seats = vendor.seatCount || teamSize || 1;
+            const unitPrice = pricing?.monthlyPrice || 0;
+            const expectedSpend =
+              vendor.planName?.toLowerCase().includes('free') || vendor.planName?.toLowerCase().includes('hobby')
+                ? 0
+                : vendor.seatCount
+                  ? vendor.seatCount * unitPrice
+                  : unitPrice > 0
+                    ? seats * unitPrice
+                    : currentSpend;
+
+            // Check if vendor has an active finding
+            const vendorFinding = auditResult.findings.find(
+              (f) =>
+                f.title.toLowerCase().includes(vendor.displayName.toLowerCase()) ||
+                f.id.toLowerCase().includes(vendor.vendorId.toLowerCase())
+            );
+            const variance = currentSpend - expectedSpend;
+            const isOver = variance > expectedSpend * 0.2 || !!vendorFinding;
+
             return (
-              <div key={vendor.vendorId} className="rounded-lg border border-[#E5E4DF] bg-[#FAFAF8] p-3.5 space-y-2.5">
+              <div
+                key={vendor.vendorId}
+                className={`rounded-xl border p-4 space-y-3 transition-all ${
+                  isOver ? 'border-[#FECACA] bg-[#FEF2F2]/50' : 'border-[#E5E4DF] bg-[#FAFAF8]'
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-xs text-[#111110]">{vendor.displayName}</span>
-                  <span className={`text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded ${
-                    forecast?.trend === 'increasing' ? 'bg-[#FEE2E2] text-[#DC2626]' : forecast?.trend === 'decreasing' ? 'bg-[#D1FAE5] text-[#059669]' : 'bg-[#F4F4F1] text-[#605F5B]'
-                  }`}>
-                    {forecast?.trend || 'stable'}
+                  <span className="font-bold text-sm text-[#111110]">{vendor.displayName}</span>
+                  <span
+                    className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full ${
+                      isOver
+                        ? 'bg-[#FEE2E2] text-[#DC2626]'
+                        : 'bg-[#D1FAE5] text-[#059669]'
+                    }`}
+                  >
+                    {isOver ? '⚠️ Check Pricing / Seats' : '✓ Aligned'}
                   </span>
                 </div>
 
-                <div className="text-[11px] text-[#605F5B] font-mono">
-                  Current: <span className="font-semibold text-[#111110]">${currentSpend}/mo</span>
-                  {targetMonth && (
-                    <span className="block mt-0.5 text-[#6D28D9]">
-                      Forecast: ${Math.round(targetAmount || 0)}/mo by {targetMonth}
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between items-baseline font-mono">
+                    <span className="text-[#605F5B]">Actual Spend:</span>
+                    <span className="font-bold text-sm text-[#111110]">${currentSpend}/mo</span>
+                  </div>
+                  <div className="flex justify-between items-baseline font-mono text-[11px]">
+                    <span className="text-[#A19F99]">Expected Rate:</span>
+                    <span className="text-[#605F5B]">
+                      ${Math.round(expectedSpend)}/mo
+                      {unitPrice > 0 && ` (${seats} seat${seats === 1 ? '' : 's'} @ $${unitPrice})`}
                     </span>
+                  </div>
+                  {isOver && variance > 0 && (
+                    <div className="flex justify-between items-baseline font-mono text-[11px] text-[#DC2626] font-semibold pt-1 border-t border-[#FEE2E2]">
+                      <span>Variance / Waste:</span>
+                      <span>+${Math.round(variance)}/mo over baseline</span>
+                    </div>
                   )}
                 </div>
 
+                {/* Forecast Banner */}
+                <div className="rounded bg-white/80 p-2 text-[11px] font-mono border border-[#E5E4DF] flex items-center justify-between">
+                  <span className="text-[#605F5B]">
+                    Forecast ({targetMonth || 'Next Qtr'}):
+                  </span>
+                  <span className="font-semibold text-[#6D28D9]">
+                    ${Math.round(targetAmount || currentSpend)}/mo ({forecast?.trend || 'stable'})
+                  </span>
+                </div>
+
                 {/* Renewal Date Picker */}
-                <div className="pt-1.5 border-t border-[#E5E4DF] flex items-center justify-between">
-                  <label className="text-[10px] text-[#A19F99]">Renewal Date:</label>
+                <div className="pt-2 border-t border-[#E5E4DF] flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-[#605F5B]">Renewal Watchdog Date:</label>
                   <input
                     type="date"
                     value={renewalDates[vendor.vendorId] || ''}
                     onChange={(e) => setRenewalDates((prev) => ({ ...prev, [vendor.vendorId]: e.target.value }))}
-                    className="text-[10px] rounded border border-[#E5E4DF] bg-white px-1.5 py-0.5 text-[#111110]"
+                    className="text-[10px] rounded border border-[#D4D3CE] bg-white px-2 py-1 text-[#111110] font-mono"
                   />
                 </div>
               </div>

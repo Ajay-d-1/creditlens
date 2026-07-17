@@ -429,6 +429,87 @@ export function detectBenchmarkOverspend(
 }
 
 // ══════════════════════════════════════════════
+//  RULE 7: Plan-Price Mismatch
+// ══════════════════════════════════════════════
+
+export function detectPlanPriceMismatch(
+  vendors: AggregatedVendor[],
+  pricingMap: Map<string, VendorPricing>
+): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const vendor of vendors) {
+    const pricing = pricingMap.get(vendor.vendorId);
+    if (!pricing) continue;
+
+    const months = getActiveMonths(vendor);
+    if (months.length === 0) continue;
+    const latestMonth = months[months.length - 1];
+    const amount = vendor.monthlyAmounts[latestMonth];
+
+    // Special case: free plans with spend (e.g., Cursor Hobby or any plan with 'hobby'/'free')
+    const planLower = vendor.planName ? vendor.planName.toLowerCase() : '';
+    if ((planLower === 'hobby' || planLower === 'free') && amount > 0) {
+      findings.push(
+        createFinding(
+          'plan-price-mismatch',
+          `${vendor.displayName}: paying $${amount}/mo on free ${vendor.planName || 'Hobby'} plan`,
+          'high',
+          amount,
+          0.95,
+          {
+            vendorId: vendor.vendorId,
+            vendor: vendor.displayName,
+            plan: vendor.planName || vendor.category,
+            actualAmount: amount,
+            expectedAmount: 0,
+            overpayPerMonth: amount,
+            overpayPercent: 100,
+          }
+        )
+      );
+      continue;
+    }
+
+    // Check against expected price per seat if seatCount is provided (or default 1 seat)
+    const seats = vendor.seatCount && vendor.seatCount > 0 ? vendor.seatCount : 1;
+    const basePrice =
+      (planLower === 'team' || planLower === 'business' || planLower === 'teams') && pricing.teamPlanPrice
+        ? pricing.teamPlanPrice
+        : pricing.monthlyPrice;
+
+    if (basePrice <= 0) continue; // e.g. usage based
+
+    const expected = basePrice * seats;
+    const tolerance = expected * 1.2; // 20% over is acceptable
+
+    if (amount > tolerance) {
+      const overpay = amount - expected;
+      findings.push(
+        createFinding(
+          'plan-price-mismatch',
+          `${vendor.displayName}: paying ${Math.round((amount / expected) * 100)}% above listed price ($${Math.round(amount / seats)}/seat vs $${basePrice}/seat)`,
+          'high',
+          overpay,
+          0.9,
+          {
+            vendorId: vendor.vendorId,
+            vendor: vendor.displayName,
+            plan: vendor.planName || vendor.category,
+            actualAmount: amount,
+            expectedAmount: expected,
+            overpayPerMonth: overpay,
+            overpayPercent: Math.round(((amount - expected) / expected) * 100),
+          }
+        )
+      );
+    }
+  }
+
+  return findings;
+}
+
+// ══════════════════════════════════════════════
 //  MAIN: Generate All Findings
 // ══════════════════════════════════════════════
 
@@ -440,7 +521,7 @@ export interface GenerateFindingsInput {
 }
 
 /**
- * Run all 6 finding rules against the aggregated vendor data.
+ * Run all 7 finding rules against the aggregated vendor data.
  * Returns de-duplicated findings and computed totals.
  */
 export function generateFindings(input: GenerateFindingsInput): AuditResult {
@@ -457,6 +538,7 @@ export function generateFindings(input: GenerateFindingsInput): AuditResult {
     ...detectSpendAnomaly(vendors),
     ...detectMonthlyToAnnual(vendors, pricingMap),
     ...detectBenchmarkOverspend(vendors, teamSize, benchmarkBands),
+    ...detectPlanPriceMismatch(vendors, pricingMap),
   ];
 
   // Compute totals

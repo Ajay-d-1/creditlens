@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run && jest",
     "test:vitest": "vitest run",
-    "test:all": "jest && vitest run"
+    "test:all": "vitest run && jest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",

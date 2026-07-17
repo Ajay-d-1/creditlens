@@ -47,6 +47,8 @@ export interface AggregatedVendor {
   displayName: string;
   category: VendorCategory;
   monthlyAmounts: Record<string, number>; // "2026-01" → total
+  planName?: string;
+  seatCount?: number;
 }
 
 export interface AggregationResult {
@@ -64,7 +66,8 @@ export type FindingType =
   | 'price-increase'
   | 'spend-anomaly'
   | 'monthly-to-annual'
-  | 'benchmark-overspend';
+  | 'benchmark-overspend'
+  | 'plan-price-mismatch';
 
 export interface Finding {
   id: string;

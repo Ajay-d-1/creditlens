@@ -241,7 +241,65 @@ export default function Home() {
     setTeamSize(SAMPLE_TEAM_SIZE);
     setCompanyName(SAMPLE_COMPANY_NAME);
     setEngineResult(result);
+    saveToAuditHistory(
+      agg.vendors.length,
+      result.totalMonthlySpend,
+      result.potentialMonthlySavings,
+      agg.vendors,
+      result.findings[0]?.title || 'No issues found'
+    );
   }, []);
+
+  function mapToEngineCategory(raw: string): AggregatedVendor['category'] {
+    const lower = raw.toLowerCase();
+    if (lower.includes('code')) return 'coding';
+    if (lower.includes('chat')) return 'chat';
+    if (lower.includes('api')) return 'api';
+    if (lower.includes('image')) return 'image';
+    if (lower.includes('audio')) return 'audio';
+    if (lower.includes('video')) return 'video';
+    return 'productivity';
+  }
+
+  function saveToAuditHistory(
+    toolCount: number,
+    totalSpend: number,
+    totalSavings: number,
+    vendors: AggregatedVendor[],
+    topFindingTitle: string
+  ) {
+    try {
+      const history = JSON.parse(localStorage.getItem('creditlens_audit_history') || '[]');
+      const categories: Record<string, number> = {};
+      vendors.forEach((v) => {
+        const cat = v.category || 'productivity';
+        const spend = Object.values(v.monthlyAmounts)[0] || 0;
+        categories[cat] = (categories[cat] || 0) + spend;
+      });
+      history.unshift({
+        id: generateId(),
+        date: new Date().toISOString(),
+        toolCount,
+        totalSpend,
+        totalSavings,
+        categories,
+        topFindingTitle,
+      });
+      localStorage.setItem('creditlens_audit_history', JSON.stringify(history.slice(0, 20)));
+    } catch {}
+  }
+
+  function convertManualToAggregated(tools: ToolEntry[]): AggregatedVendor[] {
+    const currentMonth = new Date().toISOString().slice(0, 7); // e.g., "2026-07"
+    return tools.map((t) => ({
+      vendorId: t.tool,
+      displayName: TOOLS[t.tool]?.name || t.tool,
+      category: mapToEngineCategory(TOOLS[t.tool]?.category || 'productivity'),
+      monthlyAmounts: { [currentMonth]: t.monthlySpend },
+      planName: t.plan,
+      seatCount: t.seats,
+    }));
+  }
 
   /* ── Run Audit ── */
   async function runAuditAndSummarize() {
@@ -254,14 +312,9 @@ export default function Home() {
     setShareId('');
     setCaptureError('');
 
-    // Feed entries into new findings engine so it transitions to AuditReport
+    // Feed entries into unified findings engine with plan metadata & seats
     const pricingMap = buildPricingMap();
-    const vendors: AggregatedVendor[] = entries.map((entry) => ({
-      vendorId: entry.tool,
-      displayName: TOOLS[entry.tool]?.name || entry.tool,
-      category: (TOOLS[entry.tool]?.category?.toLowerCase() as any) || 'coding',
-      monthlyAmounts: { '2026-06': entry.monthlySpend },
-    }));
+    const vendors = convertManualToAggregated(entries);
     const findingsResult = generateFindings({
       vendors,
       pricingMap,
@@ -277,17 +330,13 @@ export default function Home() {
     setEngineResult(findingsResult);
 
     // Save to audit history in localStorage
-    try {
-      const history = JSON.parse(localStorage.getItem('creditlens_audit_history') || '[]');
-      history.unshift({
-        id: generateId(),
-        date: new Date().toISOString(),
-        toolCount: entries.length,
-        totalSpend: result.totalMonthlySpend,
-        totalSavings: result.totalMonthlySavings,
-      });
-      localStorage.setItem('creditlens_audit_history', JSON.stringify(history.slice(0, 20)));
-    } catch {}
+    saveToAuditHistory(
+      entries.length,
+      findingsResult.totalMonthlySpend,
+      findingsResult.potentialMonthlySavings,
+      vendors,
+      findingsResult.findings[0]?.title || 'No issues found'
+    );
 
     setAiLoading(true);
     try {
@@ -487,6 +536,13 @@ export default function Home() {
                     teamSize,
                   });
                   setEngineResult(findingsResult);
+                  saveToAuditHistory(
+                    result.vendors.length,
+                    findingsResult.totalMonthlySpend,
+                    findingsResult.potentialMonthlySavings,
+                    result.vendors,
+                    findingsResult.findings[0]?.title || 'No issues found'
+                  );
                 }}
               />
             ) : (

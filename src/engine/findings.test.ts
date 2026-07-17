@@ -7,6 +7,7 @@ import {
   detectSpendAnomaly,
   detectMonthlyToAnnual,
   detectBenchmarkOverspend,
+  detectPlanPriceMismatch,
   generateFindings,
 } from './findings';
 import type { AggregatedVendor, VendorPricing, BenchmarkBand } from './types';
@@ -17,9 +18,11 @@ function makeVendor(
   vendorId: string,
   displayName: string,
   category: AggregatedVendor['category'],
-  monthlyAmounts: Record<string, number>
+  monthlyAmounts: Record<string, number>,
+  planName?: string,
+  seatCount?: number
 ): AggregatedVendor {
-  return { vendorId, displayName, category, monthlyAmounts };
+  return { vendorId, displayName, category, monthlyAmounts, planName, seatCount };
 }
 
 function makePricingMap(entries: VendorPricing[]): Map<string, VendorPricing> {
@@ -407,6 +410,55 @@ describe('detectBenchmarkOverspend', () => {
 
   it('returns empty for no vendors', () => {
     const findings = detectBenchmarkOverspend([], 1, testBands);
+    expect(findings).toHaveLength(0);
+  });
+});
+
+// ══════════════════════════════════════════════
+//  Rule 7: Plan-Price Mismatch
+// ══════════════════════════════════════════════
+
+describe('Rule 7: detectPlanPriceMismatch', () => {
+  it('flags free hobby plan with paid spend ($0 vs paid)', () => {
+    const vendors = [
+      makeVendor('cursor', 'Cursor', 'coding', { '2026-01': 30 }, 'Hobby', 1),
+    ];
+    const pricingMap = makePricingMap([
+      { vendorId: 'cursor', monthlyPrice: 20, annualPrice: 192, teamPlanPrice: 40, category: 'coding' },
+    ]);
+
+    const findings = detectPlanPriceMismatch(vendors, pricingMap);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].type).toBe('plan-price-mismatch');
+    expect(findings[0].title).toContain('Hobby');
+    expect(findings[0].monthlySavings).toBe(30);
+  });
+
+  it('flags exaggerated price per seat above 20% tolerance', () => {
+    const vendors = [
+      makeVendor('anthropic', 'Claude Pro', 'chat', { '2026-01': 400 }, 'Pro', 10),
+    ];
+    const pricingMap = makePricingMap([
+      { vendorId: 'anthropic', monthlyPrice: 20, annualPrice: 200, teamPlanPrice: 25, category: 'chat' },
+    ]);
+
+    // Expected: $20 * 10 seats = $200. Actual = $400 (200% above expected, well above 20% tolerance)
+    const findings = detectPlanPriceMismatch(vendors, pricingMap);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].type).toBe('plan-price-mismatch');
+    expect(findings[0].monthlySavings).toBe(200); // 400 - 200
+  });
+
+  it('does not flag when spend is within 20% tolerance', () => {
+    const vendors = [
+      makeVendor('anthropic', 'Claude Pro', 'chat', { '2026-01': 22 }, 'Pro', 1),
+    ];
+    const pricingMap = makePricingMap([
+      { vendorId: 'anthropic', monthlyPrice: 20, annualPrice: 200, teamPlanPrice: 25, category: 'chat' },
+    ]);
+
+    // $22 vs expected $20 (10% over, within 20% tolerance)
+    const findings = detectPlanPriceMismatch(vendors, pricingMap);
     expect(findings).toHaveLength(0);
   });
 });
