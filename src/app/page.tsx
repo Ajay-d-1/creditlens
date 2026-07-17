@@ -9,9 +9,19 @@ import {
   Zap,
   Minus,
   Plus,
+  FileText,
 } from 'lucide-react';
 import { ShareAuditButton } from '@/components/ShareAuditButton';
+import { StatementUpload } from '@/components/StatementUpload';
 import { runAudit, type AuditFinding, type AuditResult } from '@/lib/audit-engine';
+import { generateFindings } from '@/engine/findings';
+import { buildPricingMap } from '@/data/pricing';
+import { BENCHMARK_BANDS } from '@/data/benchmarks';
+import type { AggregationResult, AuditResult as EngineAuditResult, AggregatedVendor } from '@/engine/types';
+import { AuditReport } from '@/components/AuditReport';
+import { generateSampleTransactions, SAMPLE_COMPANY_NAME, SAMPLE_TEAM_SIZE } from '@/demo/sampleData';
+import { aggregateTransactions } from '@/engine/aggregate';
+import { matchVendor } from '@/engine/vendorMatcher';
 
 /* ─────────────────────────────────────────────
  *  TYPES & CONSTANTS
@@ -126,6 +136,7 @@ function useCountUp(target: number, duration: number = 600): number {
 
 export default function Home() {
   /* ── State ── */
+  const [inputMode, setInputMode] = useState<'manual' | 'csv'>('csv');
   const [entries, setEntries] = useState<ToolEntry[]>([]);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [useCase, setUseCase] = useState<string>('coding');
@@ -133,6 +144,8 @@ export default function Home() {
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [csvAggregation, setCsvAggregation] = useState<AggregationResult | null>(null);
+  const [engineResult, setEngineResult] = useState<EngineAuditResult | null>(null);
 
   // Email capture / share state
   const [email, setEmail] = useState('');
@@ -213,6 +226,23 @@ export default function Home() {
     input.click();
   }, []);
 
+  /* ── Load Sample Data ── */
+  const handleLoadSampleData = useCallback(() => {
+    const sampleRows = generateSampleTransactions();
+    const agg = aggregateTransactions(sampleRows, matchVendor);
+    const pricingMap = buildPricingMap();
+    const result = generateFindings({
+      vendors: agg.vendors,
+      pricingMap,
+      benchmarkBands: BENCHMARK_BANDS,
+      teamSize: SAMPLE_TEAM_SIZE,
+    });
+    setCsvAggregation(agg);
+    setTeamSize(SAMPLE_TEAM_SIZE);
+    setCompanyName(SAMPLE_COMPANY_NAME);
+    setEngineResult(result);
+  }, []);
+
   /* ── Run Audit ── */
   async function runAuditAndSummarize() {
     if (entries.length === 0) return;
@@ -223,6 +253,28 @@ export default function Home() {
     setEmailCaptured(false);
     setShareId('');
     setCaptureError('');
+
+    // Feed entries into new findings engine so it transitions to AuditReport
+    const pricingMap = buildPricingMap();
+    const vendors: AggregatedVendor[] = entries.map((entry) => ({
+      vendorId: entry.tool,
+      displayName: TOOLS[entry.tool]?.name || entry.tool,
+      category: (TOOLS[entry.tool]?.category?.toLowerCase() as any) || 'coding',
+      monthlyAmounts: { '2026-06': entry.monthlySpend },
+    }));
+    const findingsResult = generateFindings({
+      vendors,
+      pricingMap,
+      benchmarkBands: BENCHMARK_BANDS,
+      teamSize,
+    });
+    setCsvAggregation({
+      vendors,
+      unmatchedRows: [],
+      totalMatched: entries.length,
+      totalRows: entries.length,
+    });
+    setEngineResult(findingsResult);
 
     // Save to audit history in localStorage
     try {
@@ -334,35 +386,113 @@ export default function Home() {
    * ═══════════════════════════════════════════════ */
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── TOP BAR ── */}
-      <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#E5E4DF] bg-white shrink-0">
-        <div>
-          <h1 className="text-[13px] font-semibold text-[#111110]">New Audit</h1>
-          <p className="text-[11px] text-[#A19F99] mt-0.5">Add your AI tools to analyze spend</p>
+      {/* ── TOP BAR (Input Mode Only) ── */}
+      {!engineResult && (
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#E5E4DF] bg-white shrink-0">
+          <div>
+            <h1 className="text-[14px] font-bold text-[#111110]">AI Spend Audit</h1>
+            <p className="text-[11px] text-[#A19F99] mt-0.5">Upload a statement or try sample data to analyze AI tool spend</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleLoadSampleData}
+              className="rounded-lg border border-[#6D28D9] bg-[#EDE9FE] px-3.5 py-1.5 text-[12px] font-semibold text-[#6D28D9] hover:bg-[#DDD6FE] transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <span>✨</span> Try with sample data
+            </button>
+            {inputMode === 'manual' && (
+              <>
+                <button type="button" onClick={handleCSVImport} className="cl-btn-ghost">
+                  <Upload size={12} /> Import CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={runAuditAndSummarize}
+                  disabled={entries.length === 0 || isRunning}
+                  className="cl-btn-primary inline-flex items-center gap-2 text-[12px]"
+                >
+                  {isRunning && <Loader2 size={13} className="animate-spin" />}
+                  Run Audit
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={handleCSVImport} className="cl-btn-ghost">
-            <Upload size={12} /> Import CSV
-          </button>
-          <button
-            type="button"
-            onClick={runAuditAndSummarize}
-            disabled={entries.length === 0 || isRunning}
-            className="cl-btn-primary inline-flex items-center gap-2 text-[12px]"
-          >
-            {isRunning && <Loader2 size={13} className="animate-spin" />}
-            Run Audit
-          </button>
-        </div>
-      </div>
+      )}
 
-      {/* ── MAIN CONTENT — two columns ── */}
+      {/* ── MAIN CONTENT — Report View or Input Columns ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-[1fr_300px] gap-5 p-6 min-h-full">
-          {/* ════════════════════════════════
-           *  LEFT PANEL
-           * ════════════════════════════════ */}
-          <div className="space-y-4">
+        {engineResult ? (
+          <div className="mx-auto max-w-6xl p-6">
+            <AuditReport
+              auditResult={engineResult}
+              aggregatedVendors={csvAggregation?.vendors}
+              companyName={companyName || 'Your Company'}
+              teamSize={teamSize}
+              onReset={() => {
+                setEngineResult(null);
+                setCsvAggregation(null);
+              }}
+              onUpdateAuditResult={(newRes) => setEngineResult(newRes)}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-[1fr_300px] gap-5 p-6 min-h-full">
+            {/* ════════════════════════════════
+             *  LEFT PANEL
+             * ════════════════════════════════ */}
+
+            {/* ── Input Mode Toggle ── */}
+            <div className="space-y-4">
+              {/* ── Input Mode Tabs ── */}
+              <div className="flex gap-1 rounded-lg bg-[#F4F4F1] p-1">
+                <button
+                  type="button"
+                  onClick={() => setInputMode('csv')}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium transition-all ${
+                    inputMode === 'csv'
+                      ? 'bg-white text-[#111110] shadow-sm font-semibold'
+                      : 'text-[#A19F99] hover:text-[#605F5B]'
+                  }`}
+                >
+                  <FileText size={13} />
+                  Import Statement (CSV)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode('manual')}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium transition-all ${
+                    inputMode === 'manual'
+                      ? 'bg-white text-[#111110] shadow-sm font-semibold'
+                      : 'text-[#A19F99] hover:text-[#605F5B]'
+                  }`}
+                >
+                  <LayoutGrid size={13} />
+                  Advanced: Manual Entry
+                </button>
+              </div>
+
+            {inputMode === 'csv' ? (
+              /* ── CSV Upload Mode ── */
+              <StatementUpload
+                onComplete={(result: AggregationResult) => {
+                  setCsvAggregation(result);
+                  // Run findings engine
+                  const pricingMap = buildPricingMap();
+                  const findingsResult = generateFindings({
+                    vendors: result.vendors,
+                    pricingMap,
+                    benchmarkBands: BENCHMARK_BANDS,
+                    teamSize,
+                  });
+                  setEngineResult(findingsResult);
+                }}
+              />
+            ) : (
+              /* ── Manual Entry Mode ── */
+              <>
+
             {/* ── Team config row ── */}
             <div className="grid grid-cols-2 gap-3">
               {/* Team Size tile */}
@@ -558,6 +688,9 @@ export default function Home() {
                 </div>
               )}
             </div>
+
+              </> /* End Manual Entry Mode */
+            )}
           </div>
 
           {/* ════════════════════════════════
@@ -768,8 +901,9 @@ export default function Home() {
                 </div>
               </>
             )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

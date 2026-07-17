@@ -1,0 +1,114 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generateFindings > snapshot: full audit result shape 1`] = `
+{
+  "findings": [
+    {
+      "annualSavings": 240,
+      "confidence": 0.5,
+      "evidence": {
+        "activeCount": 2,
+        "cheapestAmount": 20,
+        "cheapestVendor": "OpenAI / ChatGPT",
+        "duplicateTotal": 20,
+        "duplicateVendors": "Anthropic / Claude",
+        "month": "2026-01",
+      },
+      "id": "duplicate-chat-subscriptions-1",
+      "monthlySavings": 20,
+      "severity": "medium",
+      "title": "Overlapping chat subscriptions in 2026-01",
+      "type": "duplicate-chat-subscriptions",
+    },
+    {
+      "annualSavings": 39.96,
+      "confidence": 0.9,
+      "evidence": {
+        "annualIfMonthly": 240,
+        "annualPlanPrice": 200,
+        "annualSavings": 40,
+        "avgMonthlySpend": 20,
+        "monthsOfData": 4,
+        "vendor": "OpenAI / ChatGPT",
+        "vendorId": "openai",
+      },
+      "id": "monthly-to-annual-2",
+      "monthlySavings": 3.33,
+      "severity": "medium",
+      "title": "OpenAI / ChatGPT: switch to annual billing",
+      "type": "monthly-to-annual",
+    },
+    {
+      "annualSavings": 39.96,
+      "confidence": 0.9,
+      "evidence": {
+        "annualIfMonthly": 240,
+        "annualPlanPrice": 200,
+        "annualSavings": 40,
+        "avgMonthlySpend": 20,
+        "monthsOfData": 4,
+        "vendor": "Anthropic / Claude",
+        "vendorId": "anthropic",
+      },
+      "id": "monthly-to-annual-3",
+      "monthlySavings": 3.33,
+      "severity": "medium",
+      "title": "Anthropic / Claude: switch to annual billing",
+      "type": "monthly-to-annual",
+    },
+    {
+      "annualSavings": 48,
+      "confidence": 0.9,
+      "evidence": {
+        "annualIfMonthly": 240,
+        "annualPlanPrice": 192,
+        "annualSavings": 48,
+        "avgMonthlySpend": 20,
+        "monthsOfData": 4,
+        "vendor": "Cursor",
+        "vendorId": "cursor",
+      },
+      "id": "monthly-to-annual-4",
+      "monthlySavings": 4,
+      "severity": "medium",
+      "title": "Cursor: switch to annual billing",
+      "type": "monthly-to-annual",
+    },
+  ],
+  "potentialMonthlySavings": 30.659999999999997,
+  "totalAnnualSpend": 720,
+  "totalMonthlySpend": 60,
+  "vendorForecasts": [
+    {
+      "predictedAmounts": {
+        "2026-05": 20,
+        "2026-06": 20,
+        "2026-07": 20,
+      },
+      "slope": 0,
+      "trend": "stable",
+      "vendorId": "openai",
+    },
+    {
+      "predictedAmounts": {
+        "2026-05": 20,
+        "2026-06": 20,
+        "2026-07": 20,
+      },
+      "slope": 0,
+      "trend": "stable",
+      "vendorId": "anthropic",
+    },
+    {
+      "predictedAmounts": {
+        "2026-05": 20,
+        "2026-06": 20,
+        "2026-07": 20,
+      },
+      "slope": 0,
+      "trend": "stable",
+      "vendorId": "cursor",
+    },
+  ],
+}
+`;
