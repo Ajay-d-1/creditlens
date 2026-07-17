@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   detectDuplicateChats,
   detectTeamConsolidation,
+  detectShadowSpending,
   detectPriceIncrease,
   detectSpendAnomaly,
   detectMonthlyToAnnual,
@@ -162,6 +163,30 @@ describe('detectTeamConsolidation', () => {
 });
 
 // ══════════════════════════════════════════════
+//  Rule 2b: Shadow Spending Detection
+// ══════════════════════════════════════════════
+
+describe('detectShadowSpending', () => {
+  it('flags 3+ separate subscriptions when team plan exists and amount is <= team cost', () => {
+    const vendors = [
+      makeVendor('openai', 'OpenAI / ChatGPT', 'chat', { '2026-01': 80 }),
+    ];
+    const pricingMap = makePricingMap([
+      { vendorId: 'openai', monthlyPrice: 20, annualPrice: 200, teamPlanPrice: 25, category: 'chat' },
+    ]);
+    const txCounts = new Map([
+      ['openai', new Map([['2026-01', 4]])],
+    ]);
+
+    const findings = detectShadowSpending(vendors, pricingMap, txCounts);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].type).toBe('shadow-spending');
+    expect(findings[0].title).toContain('4 separate OpenAI / ChatGPT subscriptions detected');
+    expect(findings[0].monthlySavings).toBe(0);
+  });
+});
+
+// ══════════════════════════════════════════════
 //  Rule 3: Price Increase Detection
 // ══════════════════════════════════════════════
 
@@ -241,7 +266,8 @@ describe('detectSpendAnomaly', () => {
 
     expect(findings).toHaveLength(1);
     expect(findings[0].type).toBe('spend-anomaly');
-    expect(findings[0].monthlySavings).toBe(0);
+    expect(findings[0].title).toContain('requires investigation');
+    expect(findings[0].monthlySavings).toBe(170); // 200 - (20 + 2.5 * 4)
   });
 
   it('does not fire for normal variance', () => {
@@ -460,6 +486,35 @@ describe('Rule 7: detectPlanPriceMismatch', () => {
     // $22 vs expected $20 (10% over, within 20% tolerance)
     const findings = detectPlanPriceMismatch(vendors, pricingMap);
     expect(findings).toHaveLength(0);
+  });
+
+  it('infers seat count from transactionCounts and flags only if per-seat rate > 20% tolerance', () => {
+    const vendors = [
+      makeVendor('anthropic', 'Claude Pro', 'chat', { '2026-01': 200 }),
+    ];
+    const pricingMap = makePricingMap([
+      { vendorId: 'anthropic', monthlyPrice: 20, annualPrice: 200, teamPlanPrice: 25, category: 'chat' },
+    ]);
+    const txCounts = new Map([
+      ['anthropic', new Map([['2026-01', 10]])],
+    ]);
+
+    // $200 / 10 seats = $20/seat vs $20/seat listed price -> exactly equal -> NO finding!
+    const findings = detectPlanPriceMismatch(vendors, pricingMap, txCounts);
+    expect(findings).toHaveLength(0);
+  });
+
+  it('flags Verify plan tier or seat count when inferredSeats === 1 and amount > monthlyPrice * 1.2', () => {
+    const vendors = [
+      makeVendor('anthropic', 'Claude Pro', 'chat', { '2026-01': 100 }),
+    ];
+    const pricingMap = makePricingMap([
+      { vendorId: 'anthropic', monthlyPrice: 20, annualPrice: 200, teamPlanPrice: 25, category: 'chat' },
+    ]);
+
+    const findings = detectPlanPriceMismatch(vendors, pricingMap);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toContain('Verify plan tier or seat count');
   });
 });
 

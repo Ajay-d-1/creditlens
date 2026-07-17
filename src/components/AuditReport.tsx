@@ -425,14 +425,16 @@ export function AuditReport({
                     ? seats * unitPrice
                     : currentSpend;
 
-            // Check if vendor has an active finding
-            const vendorFinding = auditResult.findings.find(
+            // Check if vendor has a plan-price-mismatch finding
+            const priceMismatchFinding = auditResult.findings.find(
               (f) =>
-                f.title.toLowerCase().includes(vendor.displayName.toLowerCase()) ||
-                f.id.toLowerCase().includes(vendor.vendorId.toLowerCase())
+                f.type === 'plan-price-mismatch' &&
+                (f.evidence.vendorId === vendor.vendorId ||
+                 f.evidence.vendor === vendor.displayName ||
+                 f.id.toLowerCase().includes(vendor.vendorId.toLowerCase()))
             );
             const variance = currentSpend - expectedSpend;
-            const isOver = variance > expectedSpend * 0.2 || !!vendorFinding;
+            const isOver = !!priceMismatchFinding;
 
             return (
               <div

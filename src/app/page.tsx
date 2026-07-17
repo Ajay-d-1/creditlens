@@ -236,6 +236,7 @@ export default function Home() {
       pricingMap,
       benchmarkBands: BENCHMARK_BANDS,
       teamSize: SAMPLE_TEAM_SIZE,
+      transactionCounts: agg.transactionCounts,
     });
     setCsvAggregation(agg);
     setTeamSize(SAMPLE_TEAM_SIZE);
@@ -534,6 +535,7 @@ export default function Home() {
                     pricingMap,
                     benchmarkBands: BENCHMARK_BANDS,
                     teamSize,
+                    transactionCounts: result.transactionCounts,
                   });
                   setEngineResult(findingsResult);
                   saveToAuditHistory(

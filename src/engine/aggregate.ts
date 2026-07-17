@@ -29,6 +29,7 @@ export function aggregateTransactions(
       monthlyAmounts: Record<string, number>;
     }
   >();
+  const transactionCounts = new Map<string, Map<string, number>>();
 
   const unmatchedRows: ParsedTransaction[] = [];
   let totalMatched = 0;
@@ -48,6 +49,12 @@ export function aggregateTransactions(
       // If we can't parse the date, still count as matched but skip aggregation
       continue;
     }
+
+    if (!transactionCounts.has(match.vendorId)) {
+      transactionCounts.set(match.vendorId, new Map<string, number>());
+    }
+    const monthMap = transactionCounts.get(match.vendorId)!;
+    monthMap.set(month, (monthMap.get(month) || 0) + 1);
 
     const existing = vendorMap.get(match.vendorId);
     if (existing) {
@@ -77,5 +84,6 @@ export function aggregateTransactions(
     unmatchedRows,
     totalMatched,
     totalRows: rows.length,
+    transactionCounts,
   };
 }

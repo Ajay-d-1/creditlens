@@ -56,6 +56,7 @@ export interface AggregationResult {
   unmatchedRows: ParsedTransaction[];
   totalMatched: number;
   totalRows: number;
+  transactionCounts?: Map<string, Map<string, number>>; // vendorId -> month -> count
 }
 
 // ── Findings Engine ──
@@ -67,7 +68,8 @@ export type FindingType =
   | 'spend-anomaly'
   | 'monthly-to-annual'
   | 'benchmark-overspend'
-  | 'plan-price-mismatch';
+  | 'plan-price-mismatch'
+  | 'shadow-spending';
 
 export interface Finding {
   id: string;

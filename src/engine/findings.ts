@@ -148,7 +148,8 @@ export function detectTeamConsolidation(
 
     for (const [month, amount] of Object.entries(vendor.monthlyAmounts)) {
       // Estimate number of individual subscriptions
-      const estimatedSeats = Math.round(amount / pricing.monthlyPrice);
+      const txCount = _rawTransactionCounts?.get(vendor.vendorId)?.get(month);
+      const estimatedSeats = txCount && txCount > 0 ? txCount : Math.round(amount / pricing.monthlyPrice);
       if (estimatedSeats < 3) continue;
 
       const teamCost = estimatedSeats * pricing.teamPlanPrice;
@@ -177,6 +178,68 @@ export function detectTeamConsolidation(
         // Only report first qualifying month per vendor
         break;
       }
+    }
+  }
+
+  return findings;
+}
+
+// ══════════════════════════════════════════════
+//  RULE 2b: Shadow Spending Detection
+// ══════════════════════════════════════════════
+
+export function detectShadowSpending(
+  vendors: AggregatedVendor[],
+  pricingMap: Map<string, VendorPricing>,
+  transactionCounts?: Map<string, Map<string, number>>
+): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const vendor of vendors) {
+    if (vendor.category !== 'chat' && vendor.category !== 'coding') continue;
+
+    const pricing = pricingMap.get(vendor.vendorId);
+    const months = getActiveMonths(vendor);
+    if (months.length === 0) continue;
+    const latestMonth = months[months.length - 1];
+    const amount = vendor.monthlyAmounts[latestMonth];
+
+    const planLower = vendor.planName ? vendor.planName.toLowerCase() : '';
+    if (planLower === 'team' || planLower === 'business' || planLower === 'teams' || planLower === 'enterprise') continue;
+
+    const txCount = transactionCounts?.get(vendor.vendorId)?.get(latestMonth);
+    const count = txCount && txCount > 0
+      ? txCount
+      : vendor.seatCount && vendor.seatCount > 0
+        ? vendor.seatCount
+        : pricing && pricing.monthlyPrice > 0
+          ? Math.round(amount / pricing.monthlyPrice)
+          : 0;
+
+    if (count >= 3) {
+      const teamPlanPrice = pricing?.teamPlanPrice || null;
+      if (teamPlanPrice !== null && pricing && count * teamPlanPrice < amount) {
+        // detectTeamConsolidation already covers positive cost savings for this month
+        continue;
+      }
+
+      findings.push(
+        createFinding(
+          'shadow-spending',
+          `${count} separate ${vendor.displayName} subscriptions detected — consider consolidating to a team plan for centralized billing and seat management`,
+          'medium',
+          0,
+          0.6,
+          {
+            vendorId: vendor.vendorId,
+            vendor: vendor.displayName,
+            month: latestMonth,
+            transactionCount: count,
+            individualTotal: amount,
+            suggestedTeamPlanPrice: teamPlanPrice ?? 'N/A',
+          }
+        )
+      );
     }
   }
 
@@ -280,12 +343,13 @@ export function detectSpendAnomaly(vendors: AggregatedVendor[]): Finding[] {
       const threshold = trailingMean + 2.5 * effectiveStddev;
 
       if (effectiveStddev > 0 && currentAmount > threshold) {
+        const overspend = Math.round((currentAmount - threshold) * 100) / 100;
         findings.push(
           createFinding(
             'spend-anomaly',
-            `${vendor.displayName}: unusual spend in ${months[i]}`,
+            `${vendor.displayName}: unusual spend in ${months[i]} (requires investigation)`,
             'medium',
-            0,
+            overspend,
             0.6,
             {
               vendorId: vendor.vendorId,
@@ -295,6 +359,7 @@ export function detectSpendAnomaly(vendors: AggregatedVendor[]): Finding[] {
               trailingMean: Math.round(trailingMean * 100) / 100,
               trailingStddev: Math.round(trailingStddev * 100) / 100,
               threshold: Math.round(threshold * 100) / 100,
+              overspend,
             }
           )
         );
@@ -434,7 +499,8 @@ export function detectBenchmarkOverspend(
 
 export function detectPlanPriceMismatch(
   vendors: AggregatedVendor[],
-  pricingMap: Map<string, VendorPricing>
+  pricingMap: Map<string, VendorPricing>,
+  transactionCounts?: Map<string, Map<string, number>>
 ): Finding[] {
   const findings: Finding[] = [];
 
@@ -472,7 +538,13 @@ export function detectPlanPriceMismatch(
     }
 
     // Check against expected price per seat if seatCount is provided (or default 1 seat)
-    const seats = vendor.seatCount && vendor.seatCount > 0 ? vendor.seatCount : 1;
+    const txCount = transactionCounts?.get(vendor.vendorId)?.get(latestMonth);
+    const inferredSeats = txCount && txCount > 0
+      ? txCount
+      : vendor.seatCount && vendor.seatCount > 0
+        ? vendor.seatCount
+        : 1;
+
     const basePrice =
       (planLower === 'team' || planLower === 'business' || planLower === 'teams') && pricing.teamPlanPrice
         ? pricing.teamPlanPrice
@@ -480,26 +552,32 @@ export function detectPlanPriceMismatch(
 
     if (basePrice <= 0) continue; // e.g. usage based
 
-    const expected = basePrice * seats;
-    const tolerance = expected * 1.2; // 20% over is acceptable
+    const perSeatRate = amount / Math.max(inferredSeats, 1);
+    const tolerance = basePrice * 1.2; // 20% over is acceptable
 
-    if (amount > tolerance) {
-      const overpay = amount - expected;
+    if (perSeatRate > tolerance) {
+      const overpayPerSeat = perSeatRate - basePrice;
+      const totalOverpay = Math.round((amount - (basePrice * inferredSeats)) * 100) / 100;
+      const title = inferredSeats === 1
+        ? `${vendor.displayName}: Verify plan tier or seat count ($${Math.round(perSeatRate)}/mo vs $${basePrice}/mo listed price)`
+        : `${vendor.displayName}: paying ${Math.round((perSeatRate / basePrice) * 100)}% above listed price ($${Math.round(perSeatRate)}/seat vs $${basePrice}/seat)`;
+
       findings.push(
         createFinding(
           'plan-price-mismatch',
-          `${vendor.displayName}: paying ${Math.round((amount / expected) * 100)}% above listed price ($${Math.round(amount / seats)}/seat vs $${basePrice}/seat)`,
+          title,
           'high',
-          overpay,
+          totalOverpay > 0 ? totalOverpay : Math.round(overpayPerSeat * inferredSeats * 100) / 100,
           0.9,
           {
             vendorId: vendor.vendorId,
             vendor: vendor.displayName,
             plan: vendor.planName || vendor.category,
-            actualAmount: amount,
-            expectedAmount: expected,
-            overpayPerMonth: overpay,
-            overpayPercent: Math.round(((amount - expected) / expected) * 100),
+            actualTotal: amount,
+            inferredSeats,
+            perSeatRate: Math.round(perSeatRate * 100) / 100,
+            expectedPerSeat: basePrice,
+            overpayPerSeat: Math.round(overpayPerSeat * 100) / 100,
           }
         )
       );
@@ -518,10 +596,11 @@ export interface GenerateFindingsInput {
   pricingMap: Map<string, VendorPricing>;
   benchmarkBands: BenchmarkBand[];
   teamSize: number;
+  transactionCounts?: Map<string, Map<string, number>>;
 }
 
 /**
- * Run all 7 finding rules against the aggregated vendor data.
+ * Run all finding rules against the aggregated vendor data.
  * Returns de-duplicated findings and computed totals.
  */
 export function generateFindings(input: GenerateFindingsInput): AuditResult {
@@ -533,12 +612,13 @@ export function generateFindings(input: GenerateFindingsInput): AuditResult {
   // Run all rules
   const allFindings: Finding[] = [
     ...detectDuplicateChats(vendors, pricingMap),
-    ...detectTeamConsolidation(vendors, pricingMap),
+    ...detectTeamConsolidation(vendors, pricingMap, input.transactionCounts),
+    ...detectShadowSpending(vendors, pricingMap, input.transactionCounts),
     ...detectPriceIncrease(vendors),
     ...detectSpendAnomaly(vendors),
     ...detectMonthlyToAnnual(vendors, pricingMap),
     ...detectBenchmarkOverspend(vendors, teamSize, benchmarkBands),
-    ...detectPlanPriceMismatch(vendors, pricingMap),
+    ...detectPlanPriceMismatch(vendors, pricingMap, input.transactionCounts),
   ];
 
   // Compute totals

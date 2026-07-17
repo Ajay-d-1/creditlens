@@ -447,7 +447,7 @@ export function StatementUpload({ onComplete }: StatementUploadProps) {
             <div className="flex items-center gap-2 rounded-lg bg-[#FEF3C7] border border-[#FCD34D] px-3 py-2">
               <AlertCircle size={14} className="text-[#D97706] shrink-0" />
               <p className="text-[11px] text-[#92400E]">
-                {aggregation.unmatchedRows.length} transaction{aggregation.unmatchedRows.length !== 1 ? 's' : ''} couldn&apos;t be matched to a known AI vendor and will be skipped.
+                {aggregation.unmatchedRows.length} {aggregation.unmatchedRows.length !== 1 ? 'transactions' : 'transaction'} couldn&apos;t be matched to a known AI vendor and will be skipped.
               </p>
             </div>
           )}
